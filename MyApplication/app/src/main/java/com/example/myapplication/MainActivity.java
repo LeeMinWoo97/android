@@ -169,6 +169,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         makerNumber.setMap(mNaverMap);
         polygonList.add(latLng);
 
+
+
+        //정렬 compaerto 시계방향
+
         if (polygonList.size() >= 3) {
             polygonOverlay.setCoords(polygonList);
             polygonOverlay.setMap(mNaverMap);
@@ -182,6 +186,31 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 //                Toast.LENGTH_SHORT).show();
 
     }
+
+    @Override
+    public ArrayList compareTo(ArrayList <LatLng> polygonList) {
+        float averageX = 0;
+        float averageY = 0;
+        for (Point point : points) {
+            averageX += point.x;
+            averageY += point.y;
+        }
+        final float finalAverageX = averageX / points.size();
+         final float finalAverageY = averageY / points.size();
+        Comparator<Point> comparator = (lhs, rhs) -> {
+            double lhsAngle = Math.atan2(lhs.y - finalAverageY, lhs.x - finalAverageX);
+            double rhsAngle = Math.atan2(rhs.y - finalAverageY, rhs.x - finalAverageX);
+            // Depending on the coordinate system, you might need to reverse these two conditions
+            if (lhsAngle < rhsAngle) return -1;
+            if (lhsAngle > rhsAngle) return 1;
+            return 0;
+        };
+        Collections.sort(points, comparator);
+
+
+    }
+
+
 
 
 
