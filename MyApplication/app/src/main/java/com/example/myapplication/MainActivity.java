@@ -8,6 +8,7 @@ import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -29,15 +30,18 @@ import com.naver.maps.map.overlay.PolygonOverlay;
 import com.naver.maps.map.overlay.PolylineOverlay;
 import com.naver.maps.map.util.FusedLocationSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, NaverMap.OnMapClickListener {
 
     private FusedLocationSource mLocationSource;
-    private NaverMap naverMap;
     CheckBox checkBox;
-    NaverMap mNaverMap;
+    private NaverMap mNaverMap;
+    ArrayList <LatLng> polygonList =new ArrayList<LatLng>();
+    private PolygonOverlay polygonOverlay;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,7 +69,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onMapReady(@NonNull NaverMap naverMap) {
-        this.naverMap = naverMap;
+        mNaverMap = naverMap;
+
+        polygonOverlay = new PolygonOverlay();
 
         CameraPosition cameraPosition = new CameraPosition(
                 new LatLng(35.9470944, 126.6814342),  // 위치 지정35° 56′ 43″  126° 40′ 55.8
@@ -135,6 +141,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
+        //체크박스를 이용하여 클릭시 지적편집도 출력
         CheckBox checkBox = (CheckBox) findViewById(R.id.checkBox) ;
         checkBox.setOnClickListener(new CheckBox.OnClickListener() {
             @Override
@@ -152,11 +159,31 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onMapClick(@NonNull PointF pointF, @NonNull LatLng latLng) {
-        Toast.makeText(this,
+        //클릭시 클릭위치 경도 위도 표시
+        /*Toast.makeText(this,
                 "위도: " + latLng.latitude + ", 경도: " + latLng.longitude,
-                Toast.LENGTH_SHORT).show();
+                Toast.LENGTH_SHORT).show();*/
+        //클릭시 클릭위치에 마커 표시
+        Marker makerNumber =new  Marker();
+        makerNumber.setPosition( new LatLng(latLng.latitude ,  latLng.longitude));
+        makerNumber.setMap(mNaverMap);
+        polygonList.add(latLng);
+
+        if (polygonList.size() >= 3) {
+            polygonOverlay.setCoords(polygonList);
+            polygonOverlay.setMap(mNaverMap);
+        }
+
+
+
+        //폴리곤 값이 잘 들어가는지 확인하기 위해서 사용해봄
+//        Toast.makeText(this,
+//               "" +polygonList,
+//                Toast.LENGTH_SHORT).show();
 
     }
+
+
 
 }
 
