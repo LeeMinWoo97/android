@@ -8,14 +8,16 @@ import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
+
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
+
 
 
 import com.naver.maps.geometry.LatLng;
@@ -33,15 +35,17 @@ import com.naver.maps.map.util.FusedLocationSource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-
+import java.util.Comparator;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, NaverMap.OnMapClickListener {
 
     private FusedLocationSource mLocationSource;
     CheckBox checkBox;
     private NaverMap mNaverMap;
-    ArrayList <LatLng> polygonList =new ArrayList<LatLng>();
+    ArrayList <LatLng> pointList =new ArrayList<LatLng>();
+    ArrayList <Marker> markerList =new ArrayList<Marker>();
     private PolygonOverlay polygonOverlay;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -155,6 +159,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }) ;
         naverMap.setOnMapClickListener(this);
+
+
+
     }
 
     @Override
@@ -165,54 +172,64 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Toast.LENGTH_SHORT).show();*/
         //클릭시 클릭위치에 마커 표시
         Marker makerNumber =new  Marker();
+        markerList.add(makerNumber);
+
+
         makerNumber.setPosition( new LatLng(latLng.latitude ,  latLng.longitude));
         makerNumber.setMap(mNaverMap);
-        polygonList.add(latLng);
+        pointList.add(latLng);
 
 
-
+        compareTo(pointList);
         //정렬 compaerto 시계방향
 
-        if (polygonList.size() >= 3) {
-            polygonOverlay.setCoords(polygonList);
+        if (pointList.size() >= 3) {
+            polygonOverlay.setCoords(pointList);
             polygonOverlay.setMap(mNaverMap);
         }
+        int blue = 0x4D0000FF;
+        polygonOverlay.setColor(blue);
 
+        Button buttonDelete = (Button) findViewById(R.id.buttonDelete);
+        buttonDelete.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                pointList.clear();
+                for(Marker m : markerList){
+                    m.setMap(null);
+                }
+                markerList.clear();
+                polygonOverlay.setMap(null);
 
+            }
+        });
 
         //폴리곤 값이 잘 들어가는지 확인하기 위해서 사용해봄
 //        Toast.makeText(this,
 //               "" +polygonList,
 //                Toast.LENGTH_SHORT).show();
-
     }
 
-    @Override
-    public ArrayList compareTo(ArrayList <LatLng> polygonList) {
+    public ArrayList compareTo(ArrayList <LatLng> pointList) {
         float averageX = 0;
         float averageY = 0;
-        for (Point point : points) {
-            averageX += point.x;
-            averageY += point.y;
+        for (LatLng latLng: pointList) {
+            averageX += latLng.latitude;
+            averageY += latLng.longitude;
         }
-        final float finalAverageX = averageX / points.size();
-         final float finalAverageY = averageY / points.size();
-        Comparator<Point> comparator = (lhs, rhs) -> {
-            double lhsAngle = Math.atan2(lhs.y - finalAverageY, lhs.x - finalAverageX);
-            double rhsAngle = Math.atan2(rhs.y - finalAverageY, rhs.x - finalAverageX);
+        final float finalAverageX = averageX / pointList.size();
+         final float finalAverageY = averageY / pointList.size();
+        Comparator<LatLng> comparator = (lhs, rhs) -> {
+            double lhsAngle = Math.atan2(lhs.longitude - finalAverageY, lhs.latitude - finalAverageX);
+            double rhsAngle = Math.atan2(rhs.longitude - finalAverageY, rhs.latitude - finalAverageX);
             // Depending on the coordinate system, you might need to reverse these two conditions
             if (lhsAngle < rhsAngle) return -1;
             if (lhsAngle > rhsAngle) return 1;
             return 0;
         };
-        Collections.sort(points, comparator);
+        Collections.sort(pointList, comparator);
 
-
+        return pointList;
     }
-
-
-
-
 
 }
 
