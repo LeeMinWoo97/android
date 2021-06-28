@@ -22,10 +22,12 @@ import android.widget.TextView;
 
 import com.naver.maps.geometry.LatLng;
 import com.naver.maps.map.CameraPosition;
+import com.naver.maps.map.LocationTrackingMode;
 import com.naver.maps.map.MapFragment;
 import com.naver.maps.map.MapView;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.OnMapReadyCallback;
+import com.naver.maps.map.overlay.LocationOverlay;
 import com.naver.maps.map.overlay.Marker;
 import com.naver.maps.map.overlay.PathOverlay;
 import com.naver.maps.map.overlay.PolygonOverlay;
@@ -45,6 +47,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     ArrayList <LatLng> pointList =new ArrayList<LatLng>();
     ArrayList <Marker> markerList =new ArrayList<Marker>();
     private PolygonOverlay polygonOverlay;
+
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
+    private FusedLocationSource locationSource;
 
 
     @Override
@@ -67,6 +72,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         MapView mapView = (MapView) findViewById(R.id.map);
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(this);
+
+        locationSource =
+                new FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE);
+
 
 
     }
@@ -160,6 +169,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }) ;
         naverMap.setOnMapClickListener(this);
 
+        LocationOverlay locationOverlay = naverMap.getLocationOverlay();
+        locationOverlay.setVisible(true);
+
+
+        naverMap.setLocationSource(locationSource);
+        naverMap.setLocationTrackingMode(LocationTrackingMode.Follow);
 
 
     }
@@ -229,6 +244,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Collections.sort(pointList, comparator);
 
         return pointList;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,  @NonNull int[] grantResults) {
+        if (locationSource.onRequestPermissionsResult(
+                requestCode, permissions, grantResults)) {
+            if (!locationSource.isActivated()) { // 권한 거부됨
+                mNaverMap.setLocationTrackingMode(LocationTrackingMode.None);
+            }
+            return;
+        }
+        super.onRequestPermissionsResult(
+                requestCode, permissions, grantResults);
     }
 
 }
