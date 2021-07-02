@@ -3,6 +3,7 @@ package com.example.myapplication;
 
 import android.graphics.Color;
 import android.graphics.PointF;
+import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
@@ -17,9 +18,12 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 
-
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.naver.maps.geometry.LatLng;
 import com.naver.maps.map.CameraPosition;
 import com.naver.maps.map.LocationTrackingMode;
@@ -27,6 +31,7 @@ import com.naver.maps.map.MapFragment;
 import com.naver.maps.map.MapView;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.OnMapReadyCallback;
+import com.naver.maps.map.overlay.InfoWindow;
 import com.naver.maps.map.overlay.LocationOverlay;
 import com.naver.maps.map.overlay.Marker;
 import com.naver.maps.map.overlay.PathOverlay;
@@ -34,10 +39,23 @@ import com.naver.maps.map.overlay.PolygonOverlay;
 import com.naver.maps.map.overlay.PolylineOverlay;
 import com.naver.maps.map.util.FusedLocationSource;
 
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+
+import javax.net.ssl.HttpsURLConnection;
+
+
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, NaverMap.OnMapClickListener {
 
@@ -50,10 +68,93 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
     private FusedLocationSource locationSource;
+    private HttpsURLConnection http;
+    private URL url;
+    private InputStreamReader in;
 
+    public class thread extends AsyncTask<LatLng, String, String> {
+
+        @Override
+        protected String doInBackground(LatLng... latLngs) {
+            String strCoord = String.valueOf(latLngs[0].longitude) + "," + String.valueOf(latLngs[0].latitude);
+            StringBuilder sb = new StringBuilder();
+
+            String api ="https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc?coords="+strCoord+"&sourcecrs=epsg:4326&orders=addr&output=json";
+            try{
+                url = new URL(api.toString());
+                http= (HttpsURLConnection)url.openConnection();
+                http.setRequestMethod("GET");
+                http.setRequestProperty("Content-Type","application/josn");
+                http.setRequestProperty("X-NCP-APIGW-API-KEY-ID","hruw818xqa");
+                http.setRequestProperty("X-NCP-APIGW-API-KEY","BxzEOvfUCUfMLnPUiggy1iXke77Q9pIgalmqLa8R");
+
+
+                BufferedReader rd;
+                if(http.getResponseCode() >= 200 && http.getResponseCode() <= 300) {
+                    rd = new BufferedReader(new InputStreamReader(http.getInputStream()));
+                } else {
+                    rd = new BufferedReader(new InputStreamReader(http.getErrorStream()));
+                }
+                String line;
+                while ((line = rd.readLine()) != null) {
+                    sb.append(line);
+                }
+                rd.close();
+                http.disconnect();
+            }
+            catch(Exception e){
+                return null;
+            }
+            return sb.toString();
+        }
+        protected void onPostExecute(String jsonStr,LatLng... latLngs){
+            JsonParser jsonParser = new JsonParser();
+
+            JsonObject jsonObj = (JsonObject) jsonParser.parse(jsonStr);
+            JsonArray jsonArray = (JsonArray) jsonObj.get("results");
+            jsonObj = (JsonObject) jsonArray.get(0);
+            jsonObj = (JsonObject) jsonObj.get("code");
+            String pnu = jsonObj.get("id").getAsString();
+
+            jsonObj = (JsonObject) jsonParser.parse(jsonStr);
+            jsonArray = (JsonArray) jsonObj.get("results");
+            jsonObj = (JsonObject) jsonArray.get(0);
+            jsonObj = (JsonObject) jsonObj.get("land");
+            pnu = pnu + jsonObj.get("type").getAsString();
+            String number1 = jsonObj.get("number1").getAsString();
+            String number2 = jsonObj.get("number2").getAsString();
+            pnu = pnu + makeStringNum(number1) + makeStringNum(number2);
+
+            Marker markers = new Marker();
+            markers.setPosition(new LatLng(latLngs[0].latitude, latLngs[0].longitude));
+            markers.setMap(mNaverMap);
+
+
+            InfoWindow infoWindow = new InfoWindow();
+            infoWindow.setAdapter(new InfoWindow.DefaultTextAdapter(getApplicationContext()) {
+                @NonNull
+                @Override
+                public CharSequence getText(@NonNull InfoWindow infoWindow) {
+                    return "";
+                }
+            });
+            infoWindow.setPosition(new LatLng(latLngs[0].latitude, latLngs[0].longitude));
+            infoWindow.open(markers);
+
+        }
+        private String makeStringNum(String number) {
+            String strNum="";
+            for (int i=0; i<4-number.length(); i++) {
+                strNum = strNum + "0";
+            }
+            strNum=strNum+number;
+            return strNum;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -76,9 +177,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationSource =
                 new FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE);
 
-
-
     }
+
 
     @Override
     public void onMapReady(@NonNull NaverMap naverMap) {
@@ -179,6 +279,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
+
+
+
     @Override
     public void onMapClick(@NonNull PointF pointF, @NonNull LatLng latLng) {
         //클릭시 클릭위치 경도 위도 표시
@@ -222,7 +325,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 //        Toast.makeText(this,
 //               "" +polygonList,
 //                Toast.LENGTH_SHORT).show();
+
+        mNaverMap.setOnMapLongClickListener((point, coord) ->{
+            new thread().execute(coord);
+        });
     }
+
 
     public ArrayList compareTo(ArrayList <LatLng> pointList) {
         float averageX = 0;
@@ -247,8 +355,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,  @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,  @NonNull int[] grantResults) {
         if (locationSource.onRequestPermissionsResult(
                 requestCode, permissions, grantResults)) {
             if (!locationSource.isActivated()) { // 권한 거부됨
