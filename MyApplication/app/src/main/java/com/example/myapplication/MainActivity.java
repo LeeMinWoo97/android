@@ -71,26 +71,27 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private HttpsURLConnection http;
     private URL url;
     private InputStreamReader in;
+    public LatLng putLatLng;
 
-    public class thread extends AsyncTask<LatLng, String, String> {
+    public class changeLatLng extends AsyncTask<LatLng, String, String> {
 
         @Override
         protected String doInBackground(LatLng... latLngs) {
             String strCoord = String.valueOf(latLngs[0].longitude) + "," + String.valueOf(latLngs[0].latitude);
             StringBuilder sb = new StringBuilder();
 
-            String api ="https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc?coords="+strCoord+"&sourcecrs=epsg:4326&orders=addr&output=json";
-            try{
+            String api = "https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc?coords=" + strCoord + "&sourcecrs=epsg:4326&orders=addr&output=json";
+            try {
                 url = new URL(api.toString());
-                http= (HttpsURLConnection)url.openConnection();
+                http = (HttpsURLConnection) url.openConnection();
                 http.setRequestMethod("GET");
-                http.setRequestProperty("Content-Type","application/josn");
-                http.setRequestProperty("X-NCP-APIGW-API-KEY-ID","hruw818xqa");
-                http.setRequestProperty("X-NCP-APIGW-API-KEY","BxzEOvfUCUfMLnPUiggy1iXke77Q9pIgalmqLa8R");
+                http.setRequestProperty("Content-Type", "application/josn");
+                http.setRequestProperty("X-NCP-APIGW-API-KEY-ID", "hruw818xqa");
+                http.setRequestProperty("X-NCP-APIGW-API-KEY", "BxzEOvfUCUfMLnPUiggy1iXke77Q9pIgalmqLa8R");
 
 
                 BufferedReader rd;
-                if(http.getResponseCode() >= 200 && http.getResponseCode() <= 300) {
+                if (http.getResponseCode() >= 200 && http.getResponseCode() <= 300) {
                     rd = new BufferedReader(new InputStreamReader(http.getInputStream()));
                 } else {
                     rd = new BufferedReader(new InputStreamReader(http.getErrorStream()));
@@ -101,47 +102,59 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
                 rd.close();
                 http.disconnect();
-            }
-            catch(Exception e){
+            } catch (Exception e) {
                 return null;
             }
             return sb.toString();
         }
-        protected void onPostExecute(String jsonStr,LatLng... latLngs){
-            JsonParser jsonParser = new JsonParser();
 
+
+        @Override
+        protected void onPostExecute(String jsonStr) {
+            //super.onPostExecute(s);
+            JsonParser jsonParser = new JsonParser();
+            String pnu="";
             JsonObject jsonObj = (JsonObject) jsonParser.parse(jsonStr);
             JsonArray jsonArray = (JsonArray) jsonObj.get("results");
-            jsonObj = (JsonObject) jsonArray.get(0);
-            jsonObj = (JsonObject) jsonObj.get("code");
-            String pnu = jsonObj.get("id").getAsString();
+            for(int i=1;i<=4;i++){
+                jsonObj = (JsonObject) jsonArray.get(0);
+                jsonObj = (JsonObject) jsonObj.get("region");
+                jsonObj = (JsonObject) jsonObj.get("area"+i);
+                pnu = pnu + " "+jsonObj.get("name").getAsString();
+            }
+
+
+
 
             jsonObj = (JsonObject) jsonParser.parse(jsonStr);
             jsonArray = (JsonArray) jsonObj.get("results");
             jsonObj = (JsonObject) jsonArray.get(0);
             jsonObj = (JsonObject) jsonObj.get("land");
-            pnu = pnu + jsonObj.get("type").getAsString();
             String number1 = jsonObj.get("number1").getAsString();
             String number2 = jsonObj.get("number2").getAsString();
-            pnu = pnu + makeStringNum(number1) + makeStringNum(number2);
+            pnu = pnu + number1 +"-"+ number2;
+
+
+
 
             Marker markers = new Marker();
-            markers.setPosition(new LatLng(latLngs[0].latitude, latLngs[0].longitude));
+            markers.setPosition(new LatLng(putLatLng.latitude, putLatLng.longitude));
             markers.setMap(mNaverMap);
 
 
             InfoWindow infoWindow = new InfoWindow();
+            String finalPnu = pnu;
             infoWindow.setAdapter(new InfoWindow.DefaultTextAdapter(getApplicationContext()) {
                 @NonNull
                 @Override
                 public CharSequence getText(@NonNull InfoWindow infoWindow) {
-                    return "";
+                    return finalPnu;
                 }
             });
-            infoWindow.setPosition(new LatLng(latLngs[0].latitude, latLngs[0].longitude));
+            infoWindow.setPosition(new LatLng(putLatLng.latitude, putLatLng.longitude));
             infoWindow.open(markers);
-
         }
+
         private String makeStringNum(String number) {
             String strNum="";
             for (int i=0; i<4-number.length(); i++) {
@@ -150,7 +163,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             strNum=strNum+number;
             return strNum;
         }
-    }
+        }
+
+
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -276,6 +293,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         naverMap.setLocationSource(locationSource);
         naverMap.setLocationTrackingMode(LocationTrackingMode.Follow);
 
+        mNaverMap.setOnMapLongClickListener((point, coord) ->{
+            putLatLng=coord;
+            new changeLatLng().execute(coord);
+        });
 
     }
 
@@ -326,9 +347,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 //               "" +polygonList,
 //                Toast.LENGTH_SHORT).show();
 
-        mNaverMap.setOnMapLongClickListener((point, coord) ->{
-            new thread().execute(coord);
-        });
+
     }
 
 
