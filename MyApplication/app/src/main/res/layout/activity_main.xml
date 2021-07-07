@@ -12,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_constraintEnd_toEndOf="parent"
-        tools:layout_editor_absoluteY="-56dp" />
+        tools:layout_editor_absoluteY="0dp" />
 
     <Spinner
         android:id="@+id/spinner"
@@ -47,6 +47,36 @@
         android:layout_weight="1"
         tools:ignore="MissingConstraints" />
 
+
+    <EditText
+        android:id="@+id/get_address"
+        android:layout_width="285dp"
+        android:layout_height="47dp"
+        android:layout_weight="1"
+        android:ems="10"
+        android:inputType="textPersonName"
+        android:privateImeOptions="defaultInputmode=korean"
+        android:text=""
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@+id/map"
+        app:layout_constraintHorizontal_bias="1.0"
+        app:layout_constraintStart_toStartOf="@+id/map"
+        app:layout_constraintTop_toTopOf="@+id/map"
+        app:layout_constraintVertical_bias="0.716" />
+
+    <Button
+        android:id="@+id/buttonpush"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="244dp"
+        android:layout_weight="1"
+        android:text="push"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.978"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/map"
+        app:layout_constraintVertical_bias="0.717" />
 
 
 </android.support.constraint.ConstraintLayout>

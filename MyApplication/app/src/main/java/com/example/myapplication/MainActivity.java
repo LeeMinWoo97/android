@@ -16,6 +16,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -39,15 +40,9 @@ import com.naver.maps.map.overlay.PolygonOverlay;
 import com.naver.maps.map.overlay.PolylineOverlay;
 import com.naver.maps.map.util.FusedLocationSource;
 
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,6 +60,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     ArrayList <LatLng> pointList =new ArrayList<LatLng>();
     ArrayList <Marker> markerList =new ArrayList<Marker>();
     private PolygonOverlay polygonOverlay;
+    EditText editText ;
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
     private FusedLocationSource locationSource;
@@ -73,6 +69,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private InputStreamReader in;
     public LatLng putLatLng;
 
+    //address
     public class changeLatLng extends AsyncTask<LatLng, String, String> {
 
         @Override
@@ -123,9 +120,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 pnu = pnu + " "+jsonObj.get("name").getAsString();
             }
 
-
-
-
             jsonObj = (JsonObject) jsonParser.parse(jsonStr);
             jsonArray = (JsonArray) jsonObj.get("results");
             jsonObj = (JsonObject) jsonArray.get(0);
@@ -166,7 +160,67 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
 
 
+    public class addressMarker extends AsyncTask<String, String, String>{
+        @Override
+        protected String doInBackground(String... strings) {
 
+
+            String api ="https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query="+strings[0];
+            StringBuilder sb = new StringBuilder();
+            try {
+                url = new URL(api.toString());
+                http = (HttpsURLConnection) url.openConnection();
+                http.setRequestMethod("GET");
+                http.setRequestProperty("Content-Type", "application/josn");
+                http.setRequestProperty("X-NCP-APIGW-API-KEY-ID", "hruw818xqa");
+                http.setRequestProperty("X-NCP-APIGW-API-KEY", "BxzEOvfUCUfMLnPUiggy1iXke77Q9pIgalmqLa8R");
+
+
+                BufferedReader rd;
+                if (http.getResponseCode() >= 200 && http.getResponseCode() <= 300) {
+                    rd = new BufferedReader(new InputStreamReader(http.getInputStream()));
+                } else {
+                    rd = new BufferedReader(new InputStreamReader(http.getErrorStream()));
+                }
+                String line;
+                while ((line = rd.readLine()) != null) {
+                    sb.append(line);
+                }
+                rd.close();
+                http.disconnect();
+            } catch (Exception e) {
+                return null;
+            }
+            return sb.toString();
+        }
+
+        protected void onPostExecute(String jsonStr) {
+            JsonParser jsonParser = new JsonParser();
+            double pnuLatitude;
+            double pnuLongitude;
+            JsonObject jsonObj = (JsonObject) jsonParser.parse(jsonStr);
+            JsonArray jsonArray = (JsonArray) jsonObj.get("addresses");
+            jsonObj = (JsonObject) jsonArray.get(0);
+            pnuLatitude =jsonObj.get("x").getAsDouble();
+            pnuLongitude =jsonObj.get("y").getAsDouble();
+
+            Marker markers = new Marker();
+            markers.setPosition(new LatLng(pnuLongitude, pnuLatitude));
+            markers.setMap(mNaverMap);
+
+        }
+
+        private String makeStringNum(String number) {
+            String strNum="";
+            for (int i=0; i<4-number.length(); i++) {
+                strNum = strNum + "0";
+            }
+            strNum=strNum+number;
+            return strNum;
+        }
+
+
+    }
 
 
     @Override
@@ -177,6 +231,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         Spinner spinner = (Spinner) findViewById(R.id.spinner);
         CheckBox checkBox = (CheckBox) findViewById(R.id.checkBox) ;
+
 
 
         FragmentManager fm = getSupportFragmentManager();
@@ -200,7 +255,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onMapReady(@NonNull NaverMap naverMap) {
         mNaverMap = naverMap;
-
         polygonOverlay = new PolygonOverlay();
 
         CameraPosition cameraPosition = new CameraPosition(
@@ -298,6 +352,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             new changeLatLng().execute(coord);
         });
 
+
+
+        Button buttonpush = (Button) findViewById(R.id.buttonpush) ;
+        buttonpush.setOnClickListener(new Button.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                EditText editText = (EditText)findViewById(R.id.get_address);
+                String address = editText.getText().toString();
+                new addressMarker().execute(address);
+            }
+        });
     }
 
 
