@@ -30,6 +30,7 @@ import com.o3dr.services.android.lib.drone.attribute.AttributeEvent;
 import com.o3dr.services.android.lib.drone.attribute.AttributeType;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloAttributes;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloState;
+import com.o3dr.services.android.lib.drone.connection.ConnectionParameter;
 import com.o3dr.services.android.lib.drone.property.Type;
 import com.o3dr.services.android.lib.gcs.link.LinkConnectionStatus;
 
@@ -69,7 +70,20 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
         mapFragment.getMapAsync(this);
 
+        if(this.drone.isConnected()){
+            this.drone.disconnect();
+        }else{
+            ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null) ;
+            this.drone.connect(connectionParams);
+        }
 
+        Button button = (Button)findViewById(R.id.connectButton);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+            }
+        });
 /*
         this.modeSelector = (Spinner) findViewById(R.id.modeSelect);
         this.modeSelector.setOnItemSelectedListener(new Spinner.OnItemSelectedListener() {
@@ -213,11 +227,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     @Override
     public void onMapReady(@NonNull NaverMap naverMap) {
-        Button button = (Button)findViewById(R.id.connectButton);
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) {
-                ;
-            }
-        });
+
     }
 }
