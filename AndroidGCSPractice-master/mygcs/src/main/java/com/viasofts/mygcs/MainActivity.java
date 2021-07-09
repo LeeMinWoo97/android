@@ -8,6 +8,8 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
+import android.text.SpannableStringBuilder;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
@@ -15,8 +17,10 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.maps.GoogleMap;
 import com.naver.maps.map.MapFragment;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.OnMapReadyCallback;
@@ -31,6 +35,8 @@ import com.o3dr.services.android.lib.drone.attribute.AttributeType;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloAttributes;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloState;
 import com.o3dr.services.android.lib.drone.connection.ConnectionParameter;
+import com.o3dr.services.android.lib.drone.property.Altitude;
+import com.o3dr.services.android.lib.drone.property.Speed;
 import com.o3dr.services.android.lib.drone.property.Type;
 import com.o3dr.services.android.lib.gcs.link.LinkConnectionStatus;
 
@@ -49,6 +55,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     //private Spinner modeSelector;
 
     Handler mainHandler;
+    Toolbar myToolbar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +68,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
 
 
+
+
         FragmentManager fm = getSupportFragmentManager();
         MapFragment mapFragment = (MapFragment)fm.findFragmentById(R.id.map);
         if (mapFragment == null) {
@@ -70,17 +79,21 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
         mapFragment.getMapAsync(this);
 
-        if(this.drone.isConnected()){
-            this.drone.disconnect();
-        }else{
-            ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null) ;
-            this.drone.connect(connectionParams);
-        }
+
 
         Button button = (Button)findViewById(R.id.connectButton);
         button.setOnClickListener(new View.OnClickListener() {
+
+            private Drone drone = new Drone(context);
+
             @Override
             public void onClick(View view) {
+                if(this.drone.isConnected()){
+                    this.drone.disconnect();
+                }else{
+                    ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null) ;
+                    this.drone.connect(connectionParams);
+                }
 
             }
         });
@@ -228,5 +241,18 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     @Override
     public void onMapReady(@NonNull NaverMap naverMap) {
 
+        TextView textView = (TextView)findViewById(R.id.uiTextView);
+        textView.setText("전압: "+0 +" 비행모드: "+0+ " 고도: " +updateAltitude()+" 속도: "+ updateSpeed()+" YAW: "+0+" 위성: "+0);
+
     }
+
+    protected String updateAltitude() {
+        Altitude droneAltitude = this.drone.getAttribute(AttributeType.ALTITUDE);
+        return String.format("%3.1f", droneAltitude.getAltitude()) + "m";
+    }
+    protected String updateSpeed() {
+        Speed droneSpeed = this.drone.getAttribute(AttributeType.SPEED);
+       return String.format("%3.1f", droneSpeed.getGroundSpeed()) + "m/s";
+    }
+
 }
