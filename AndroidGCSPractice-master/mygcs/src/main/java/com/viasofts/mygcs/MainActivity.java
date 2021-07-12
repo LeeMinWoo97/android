@@ -15,17 +15,20 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.MAVLink.common.msg_battery_status;
 import com.google.android.gms.maps.GoogleMap;
 import com.naver.maps.map.MapFragment;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.OnMapReadyCallback;
 import com.o3dr.android.client.ControlTower;
 import com.o3dr.android.client.Drone;
+import com.o3dr.android.client.apis.VehicleApi;
 import com.o3dr.android.client.interfaces.DroneListener;
 import com.o3dr.android.client.interfaces.LinkListener;
 import com.o3dr.android.client.interfaces.TowerListener;
@@ -37,8 +40,13 @@ import com.o3dr.services.android.lib.drone.companion.solo.SoloState;
 import com.o3dr.services.android.lib.drone.connection.ConnectionParameter;
 import com.o3dr.services.android.lib.drone.property.Altitude;
 import com.o3dr.services.android.lib.drone.property.Speed;
+import com.o3dr.services.android.lib.drone.property.State;
 import com.o3dr.services.android.lib.drone.property.Type;
+import com.o3dr.services.android.lib.drone.property.VehicleMode;
 import com.o3dr.services.android.lib.gcs.link.LinkConnectionStatus;
+import com.o3dr.services.android.lib.model.AbstractCommandListener;
+
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements DroneListener, TowerListener, LinkListener, OnMapReadyCallback {
 
@@ -51,7 +59,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     private static final int DEFAULT_UDP_PORT = 14550;
     private static final int DEFAULT_USB_BAUD_RATE = 57600;
-
+    private Spinner modeSelector;
     //private Spinner modeSelector;
 
     Handler mainHandler;
@@ -65,9 +73,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         final Context context = getApplicationContext();
         this.controlTower = new ControlTower(context);
         this.drone = new Drone(context);
-
-
-
 
 
         FragmentManager fm = getSupportFragmentManager();
@@ -97,7 +102,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
             }
         });
-/*
+
+
         this.modeSelector = (Spinner) findViewById(R.id.modeSelect);
         this.modeSelector.setOnItemSelectedListener(new Spinner.OnItemSelectedListener() {
             @Override
@@ -110,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 // Do nothing
             }
         });
- */
+
         mainHandler = new Handler(getApplicationContext().getMainLooper());
     }
 
@@ -118,7 +124,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     public void onStart() {
         super.onStart();
         this.controlTower.connect(this);
-        //updateVehicleModesForType(this.droneType);
+        updateVehicleModesForType(this.droneType);
     }
 
     @Override
@@ -172,7 +178,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 break;
 
             case AttributeEvent.STATE_VEHICLE_MODE:
-//                updateVehicleMode();
+                updateVehicleMode();
                 break;
 
             case AttributeEvent.SPEED_UPDATED:
@@ -242,17 +248,55 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     public void onMapReady(@NonNull NaverMap naverMap) {
 
         TextView textView = (TextView)findViewById(R.id.uiTextView);
-        textView.setText("전압: "+0 +" 비행모드: "+0+ " 고도: " +updateAltitude()+" 속도: "+ updateSpeed()+" YAW: "+0+" 위성: "+0);
+        textView.setText("전압: "+ msg_battery_status.toString +" 비행모드: "+0+ " 고도: " +updateAltitude()+" 속도: "+ updateSpeed()+" YAW: "+0+" 위성: "+0);
 
     }
-
+    // 고도 받아오는곳
     protected String updateAltitude() {
         Altitude droneAltitude = this.drone.getAttribute(AttributeType.ALTITUDE);
         return String.format("%3.1f", droneAltitude.getAltitude()) + "m";
     }
+    //속도 받아오는곳
     protected String updateSpeed() {
         Speed droneSpeed = this.drone.getAttribute(AttributeType.SPEED);
        return String.format("%3.1f", droneSpeed.getGroundSpeed()) + "m/s";
     }
+    //YAW 받아오는곳
+
+    //비행모드
+    public void onFlightModeSelected(View view) {
+        VehicleMode vehicleMode = (VehicleMode) this.modeSelector.getSelectedItem();
+        VehicleApi.getApi(this.drone).setVehicleMode(vehicleMode, new
+                AbstractCommandListener() {
+                    @Override
+                    public void onSuccess() {
+                        alertUser("Vehicle mode change successful.");
+                    }
+                    @Override
+                    public void onError(int executionError) {
+                        alertUser("Vehicle mode change failed: " + executionError);
+                    }
+                    @Override
+                    public void onTimeout() {
+                        alertUser("Vehicle mode change timed out.");
+                    }
+                });
+    }
+    protected void updateVehicleModesForType(int droneType) {
+        List<VehicleMode> vehicleModes = VehicleMode.getVehicleModePerDroneType(droneType);
+        ArrayAdapter<VehicleMode> vehicleModeArrayAdapter = new ArrayAdapter<VehicleMode>(this, android.R.layout.simple_spinner_item, vehicleModes);
+        vehicleModeArrayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        this.modeSelector.setAdapter(vehicleModeArrayAdapter);
+    }
+
+    protected void updateVehicleMode() {
+        State vehicleState = this.drone.getAttribute(AttributeType.STATE);
+        VehicleMode vehicleMode = vehicleState.getVehicleMode();
+        ArrayAdapter arrayAdapter = (ArrayAdapter) this.modeSelector.getAdapter();
+        this.modeSelector.setSelection(arrayAdapter.getPosition(vehicleMode));
+    }
+
+
+
 
 }

@@ -18,9 +18,9 @@ public class msg_battery_status extends MAVLinkMessage{
     public static final int MAVLINK_MSG_ID_BATTERY_STATUS = 147;
     public static final int MAVLINK_MSG_LENGTH = 36;
     private static final long serialVersionUID = MAVLINK_MSG_ID_BATTERY_STATUS;
+    public static String toString;
 
 
-    
     /**
     * Consumed charge, in milliampere hours (1 = 1 mAh), -1: autopilot does not provide mAh consumption estimate
     */
