@@ -21,28 +21,82 @@
         android:layout_height="wrap_content"
         android:text="Connect"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="@+id/map" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <TextView
-        android:id="@+id/uiTextView"
-        android:layout_width="match_parent"
+        android:id="@+id/TextViewVoltage"
+        android:layout_width="123dp"
         android:layout_height="25dp"
         android:background="#80000000"
         android:elevation="4dp"
-        android:text="TextView"
+        android:gravity="right"
+        android:text="TextViewVoltage"
+        app:layout_constraintStart_toStartOf="@+id/map"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/TextViewFlyingType"
+        android:layout_width="75dp"
+        android:layout_height="25dp"
+        android:background="#80000000"
+        android:elevation="4dp"
+        android:gravity="right"
+        android:text="TextViewFlyingType"
+        app:layout_constraintStart_toEndOf="@+id/TextViewVoltage"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/TextViewAltitude"
+        android:layout_width="123dp"
+        android:layout_height="25dp"
+        android:background="#80000000"
+        android:elevation="4dp"
         android:gravity="center"
-        app:layout_constraintEnd_toEndOf="@+id/map"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/map" />
+        android:text="TextViewAltitude"
+        app:layout_constraintStart_toEndOf="@+id/modeSelect"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/TextViewSpeed"
+        android:layout_width="123dp"
+        android:layout_height="25dp"
+        android:background="#80000000"
+        android:elevation="4dp"
+        android:gravity="center"
+        android:text="TextViewSpeed"
+        app:layout_constraintStart_toEndOf="@+id/TextViewAltitude"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/TextViewYaw"
+        android:layout_width="123dp"
+        android:layout_height="25dp"
+        android:background="#80000000"
+        android:elevation="4dp"
+        android:gravity="left"
+        android:text="TextViewYaw"
+        app:layout_constraintStart_toEndOf="@+id/TextViewSpeed"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/TextViewGps"
+        android:layout_width="123dp"
+        android:layout_height="25dp"
+        android:background="#80000000"
+        android:elevation="4dp"
+        android:gravity="left"
+        android:text="TextViewGps"
+        app:layout_constraintStart_toEndOf="@+id/TextViewYaw"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <Spinner
         android:id="@+id/modeSelect"
-        android:layout_width="129dp"
-        android:layout_height="46dp"
+        android:layout_width="123dp"
+        android:layout_height="25dp"
         android:layout_column="1"
-        android:layout_marginEnd="60dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@+id/connectButton" />
+        android:background="#80000000"
+        app:layout_constraintStart_toEndOf="@+id/TextViewFlyingType"
+        app:layout_constraintTop_toTopOf="parent" />
 
 
 </android.support.constraint.ConstraintLayout>
