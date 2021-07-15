@@ -2,6 +2,8 @@ package com.viasofts.mygcs;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
@@ -22,10 +24,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.MAVLink.common.msg_battery_status.*;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.maps.GoogleMap;
+import com.naver.maps.geometry.LatLng;
 import com.naver.maps.map.MapFragment;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.OnMapReadyCallback;
+import com.naver.maps.map.overlay.Marker;
 import com.o3dr.android.client.ControlTower;
 import com.o3dr.android.client.Drone;
 import com.o3dr.android.client.apis.VehicleApi;
@@ -63,7 +68,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     private static final int DEFAULT_USB_BAUD_RATE = 57600;
     private Spinner modeSelector;
     //private Spinner modeSelector;
-
+    NaverMap mNaverMap;
+    Marker marker = new Marker();
     Handler mainHandler;
     Toolbar myToolbar;
 
@@ -78,7 +84,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
 
         FragmentManager fm = getSupportFragmentManager();
-        MapFragment mapFragment = (MapFragment)fm.findFragmentById(R.id.map);
+        MapFragment mapFragment = (MapFragment) fm.findFragmentById(R.id.map);
         if (mapFragment == null) {
             mapFragment = MapFragment.newInstance();
             fm.beginTransaction().add(R.id.map, mapFragment).commit();
@@ -87,16 +93,15 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         mapFragment.getMapAsync(this);
 
 
-
-        Button button = (Button)findViewById(R.id.connectButton);
+        Button button = (Button) findViewById(R.id.connectButton);
         button.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View view) {
-                if(drone.isConnected()){
+                if (drone.isConnected()) {
                     drone.disconnect();
-                }else{
-                    ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null) ;
+                } else {
+                    ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
                     drone.connect(connectionParams);
                 }
 
@@ -200,6 +205,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             case AttributeEvent.GPS_COUNT:
                 updateGps();
                 break;
+            case AttributeEvent.GPS_POSITION:
+                updateDronePosition();
+                break;
             default:
                 // Log.i("DRONE_EVENT", event); //Uncomment to see events from the drone
                 break;
@@ -208,10 +216,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     private void checkSoloState() {
         final SoloState soloState = drone.getAttribute(SoloAttributes.SOLO_STATE);
-        if (soloState == null){
+        if (soloState == null) {
             alertUser("Unable to retrieve the solo state.");
-        }
-        else {
+        } else {
             alertUser("Solo state is up to date.");
         }
     }
@@ -253,6 +260,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     @Override
     public void onMapReady(@NonNull NaverMap naverMap) {
+        mNaverMap = naverMap;
         updateVoltage();
         updatFlyingType();
         updateAltitude();
@@ -261,46 +269,50 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         updateGps();
 
     }
+
     //전압 txet출력
-    protected void updateVoltage(){
+    protected void updateVoltage() {
         Battery droneBattery = this.drone.getAttribute(AttributeType.BATTERY);
-        TextView TextViewVoltage = (TextView)findViewById(R.id.TextViewVoltage);
-        TextViewVoltage.setText("전압: "+droneBattery.getBatteryVoltage());
+        TextView TextViewVoltage = (TextView) findViewById(R.id.TextViewVoltage);
+        TextViewVoltage.setText("전압: " + droneBattery.getBatteryVoltage());
     }
 
     //비행모드 변경
     protected void updatFlyingType() {
-        TextView TextViewFlyingType = (TextView)findViewById(R.id.TextViewFlyingType);
+        TextView TextViewFlyingType = (TextView) findViewById(R.id.TextViewFlyingType);
         TextViewFlyingType.setText("비행모드: ");
     }
 
     // 고도 받아오는곳
     protected void updateAltitude() {
         Altitude droneAltitude = this.drone.getAttribute(AttributeType.ALTITUDE);
-        TextView TextViewAltitude = (TextView)findViewById(R.id.TextViewAltitude);
-        TextViewAltitude.setText (" 고도: " +String.format("%3.1f", droneAltitude.getAltitude()) + "m");
+        TextView TextViewAltitude = (TextView) findViewById(R.id.TextViewAltitude);
+        TextViewAltitude.setText(" 고도: " + String.format("%3.1f", droneAltitude.getAltitude()) + "m");
 
     }
+
     //속도 받아오는곳
     protected void updateSpeed() {
         Speed droneSpeed = this.drone.getAttribute(AttributeType.SPEED);
-        TextView TextViewSpeed = (TextView)findViewById(R.id.TextViewSpeed);
-        TextViewSpeed.setText (" 속도: " +String.format("%3.1f", droneSpeed.getGroundSpeed()) + "m/s");
+        TextView TextViewSpeed = (TextView) findViewById(R.id.TextViewSpeed);
+        TextViewSpeed.setText(" 속도: " + String.format("%3.1f", droneSpeed.getGroundSpeed()) + "m/s");
     }
+
     //YAW 받아오는곳
-    protected void updateYaw(){
+    protected void updateYaw() {
         Attitude droneAttribute = this.drone.getAttribute(AttributeType.ATTITUDE);
-        TextView TextViewYaw = (TextView)findViewById(R.id.TextViewYaw);
-        double Yaw=droneAttribute.getYaw()+180;
-        TextViewYaw.setText (" YAW: °" +String.format("%3.1f",Yaw));
+        TextView TextViewYaw = (TextView) findViewById(R.id.TextViewYaw);
+        double Yaw = droneAttribute.getYaw() + 180;
+        TextViewYaw.setText(" YAW: °" + String.format("%3.1f", Yaw));
 
     }
 
     //위성 개수 확인
-    protected void updateGps(){
+    protected void updateGps() {
         Gps droneGps = this.drone.getAttribute(AttributeType.GPS);
-        TextView TextViewGps = (TextView)findViewById(R.id.TextViewGps);
-        TextViewGps.setText (" 위성: " + String.format("%d",droneGps.getSatellitesCount())+"개");
+
+        TextView TextViewGps = (TextView) findViewById(R.id.TextViewGps);
+        TextViewGps.setText(" 위성: " + String.format("%d", droneGps.getSatellitesCount()) + "개");
     }
 
 
@@ -313,10 +325,12 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                     public void onSuccess() {
                         alertUser("Vehicle mode change successful.");
                     }
+
                     @Override
                     public void onError(int executionError) {
                         alertUser("Vehicle mode change failed: " + executionError);
                     }
+
                     @Override
                     public void onTimeout() {
                         alertUser("Vehicle mode change timed out.");
@@ -337,6 +351,40 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         ArrayAdapter arrayAdapter = (ArrayAdapter) this.modeSelector.getAdapter();
         this.modeSelector.setSelection(arrayAdapter.getPosition(vehicleMode));
     }
+
+    //드론의 위치 표시
+    //조건 기체로부터 현재 위치를 위경도 좌표를 받아와 그위칭 드론 아이콘을 표시 (방향성이 있는 이미지를 받아온다)
+    //기체의 YAW에 따라 아이콘의 각도 변경 ,기체의 헤드방향을 이미지와 같이 점선 표시
+
+    protected void updateDronePosition(){
+        Gps location  = this.drone.getAttribute(AttributeType.GPS);
+
+        double latitude =  location.getPosition().getLatitude();
+        double longitude= location.getPosition().getLongitude();
+
+        marker.setPosition(new LatLng(latitude, longitude));
+        marker.setMap(mNaverMap);
+
+        Attitude droneAttribute = this.drone.getAttribute(AttributeType.ATTITUDE);
+        TextView TextViewYaw = (TextView) findViewById(R.id.TextViewYaw);
+        double Yaw = droneAttribute.getYaw() + 180;
+        marker.setAngle((int)Yaw);
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
