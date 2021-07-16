@@ -33,6 +33,7 @@ import com.naver.maps.map.OnMapReadyCallback;
 import com.naver.maps.map.overlay.Marker;
 import com.o3dr.android.client.ControlTower;
 import com.o3dr.android.client.Drone;
+import com.o3dr.android.client.apis.ControlApi;
 import com.o3dr.android.client.apis.VehicleApi;
 import com.o3dr.android.client.interfaces.DroneListener;
 import com.o3dr.android.client.interfaces.LinkListener;
@@ -53,6 +54,8 @@ import com.o3dr.services.android.lib.drone.property.Type;
 import com.o3dr.services.android.lib.drone.property.VehicleMode;
 import com.o3dr.services.android.lib.gcs.link.LinkConnectionStatus;
 import com.o3dr.services.android.lib.model.AbstractCommandListener;
+import com.o3dr.services.android.lib.model.SimpleCommandListener;
+
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements DroneListener, TowerListener, LinkListener, OnMapReadyCallback {
@@ -123,6 +126,73 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
 
         mainHandler = new Handler(getApplicationContext().getMainLooper());
+
+        //드론 시동 및 이착륙 버튼
+        final Button DroneStartButton = (Button) findViewById(R.id.DroneStartButton);
+        DroneStartButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                State vehicleState = drone.getAttribute(AttributeType.STATE);
+                //ARM시동걸기
+                if(vehicleState.isFlying()){
+                    ControlApi.getApi(drone).takeoff(10, new AbstractCommandListener() {
+                        @Override
+                        public void onSuccess() {
+                            alertUser("Taking off...");
+                        }
+
+                        @Override
+                        public void onError(int i) {
+                            alertUser("Unable to take off.");
+                        }
+
+                        @Override
+                        public void onTimeout() {
+                            alertUser("Unable to take off.");
+                        }
+                    });
+                    DroneStartButton.setText("Land");
+
+                }
+                //이륙
+                else if(vehicleState.isArmed()) {
+                    VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_LAND, new SimpleCommandListener() {
+                        @Override
+                        public void onError(int executionError) {
+                            alertUser("Unable to land the vehicle.");
+                        }
+
+                        @Override
+                        public void onTimeout() {
+                            alertUser("Unable to land the vehicle.");
+                        }
+                    });
+                    DroneStartButton.setText("Take_OFF");
+                }
+
+                //착륙
+                else if(vehicleState.isConnected()) {
+                    VehicleApi.getApi(drone).arm(true, false, new SimpleCommandListener() {
+                        @Override
+                        public void onError(int executionError) {
+                            alertUser("Unable to arm vehicle.");
+                        }
+
+                        @Override
+                        public void onTimeout() {
+                            alertUser("Arming operation timed out.");
+                        }
+                    });
+                    DroneStartButton.setText("ARM");
+
+                }
+            }
+
+        });
+
+
+
+
     }
 
     @Override
@@ -372,6 +442,20 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     }
 
+    /*7.2.3.2 조건
+         * 모터 가동(ARM), 이륙(TAKE-OFF), 자동착륙(LAND) 버튼을 왼쪽 아래에 만드세요.
+         * 모터 가동, 이륙, 자동착륙 버튼은 하나의 버튼이 기체 상태에 따라 TEXT가 변경되도록
+        하세요.
+         - 대기 중에는 모터 가동 상태
+         - 시동 후에는 이륙 상태
+         - 이륙 후에는 자동착륙 상태
+         - 착륙 후에는 다시 모터 상태
+         * 각 상태에 맞게 버튼의 기능도 변경하세요.
+         * 이륙 고도를 설정할 수 있는 인터페이스를 오른쪽 위에 만드세요.
+         * 이륙고도 설정 버튼을 클릭하면 +0.5, -0.5 버튼이 나타나고 다시 클릭하면 사라지게
+        하세요.
+         * 이륙 고도는 범위는 3m~10m로 설정하고, 0.5씩 증감되도록 하세요.
+         * 이륙고도 인터페이스에서 설정한 값을 기체 이륙 시에 파라미터로 사용하세요*/
 
 
 
