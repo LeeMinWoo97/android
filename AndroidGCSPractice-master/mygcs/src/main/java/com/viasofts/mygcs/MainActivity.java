@@ -152,7 +152,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 }
 
                 else if(vehicleState.isArmed()) {
-                    ControlApi.getApi(drone).takeoff(10, new AbstractCommandListener() {
+                    ControlApi.getApi(drone).takeoff(altitudeState, new AbstractCommandListener() {
                     @Override
                     public void onSuccess() {
                         alertUser("Taking off...");
