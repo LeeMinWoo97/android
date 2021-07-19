@@ -66,7 +66,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     private int droneType = Type.TYPE_UNKNOWN;
     private ControlTower controlTower;
     private final Handler handler = new Handler();
-
     private static final int DEFAULT_UDP_PORT = 14550;
     private static final int DEFAULT_USB_BAUD_RATE = 57600;
     private Spinner modeSelector;
@@ -75,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     Marker marker = new Marker();
     Handler mainHandler;
     Toolbar myToolbar;
+    double altitudeState =3.0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,16 +96,18 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         mapFragment.getMapAsync(this);
 
 
-        Button button = (Button) findViewById(R.id.connectButton);
+        final Button button = (Button) findViewById(R.id.connectButton);
         button.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View view) {
                 if (drone.isConnected()) {
                     drone.disconnect();
+                    button.setText("CONNECT");
                 } else {
                     ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
                     drone.connect(connectionParams);
+                    button.setText("DISCONNECT");
                 }
 
             }
@@ -133,29 +135,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             @Override
             public void onClick(View view) {
                 State vehicleState = drone.getAttribute(AttributeType.STATE);
-                //ARM시동걸기
+
                 if(vehicleState.isFlying()){
-                    ControlApi.getApi(drone).takeoff(10, new AbstractCommandListener() {
-                        @Override
-                        public void onSuccess() {
-                            alertUser("Taking off...");
-                        }
-
-                        @Override
-                        public void onError(int i) {
-                            alertUser("Unable to take off.");
-                        }
-
-                        @Override
-                        public void onTimeout() {
-                            alertUser("Unable to take off.");
-                        }
-                    });
-                    DroneStartButton.setText("Land");
-
-                }
-                //이륙
-                else if(vehicleState.isArmed()) {
                     VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_LAND, new SimpleCommandListener() {
                         @Override
                         public void onError(int executionError) {
@@ -170,7 +151,27 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                     DroneStartButton.setText("Take_OFF");
                 }
 
-                //착륙
+                else if(vehicleState.isArmed()) {
+                    ControlApi.getApi(drone).takeoff(10, new AbstractCommandListener() {
+                    @Override
+                    public void onSuccess() {
+                        alertUser("Taking off...");
+                    }
+
+                    @Override
+                    public void onError(int i) {
+                        alertUser("Unable to take off.");
+                    }
+
+                    @Override
+                    public void onTimeout() {
+                        alertUser("Unable to take off.");
+                    }
+                    });
+                    DroneStartButton.setText("Land");
+                }
+
+
                 else if(vehicleState.isConnected()) {
                     VehicleApi.getApi(drone).arm(true, false, new SimpleCommandListener() {
                         @Override
@@ -189,9 +190,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             }
 
         });
-
-
-
+        landAltitude();
+        altitudePlus();
+        altitudeSubtract();
 
     }
 
@@ -458,7 +459,57 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
          * 이륙고도 인터페이스에서 설정한 값을 기체 이륙 시에 파라미터로 사용하세요*/
 
 
+    private void landAltitude(){
 
+        Button landAltitudeButton = (Button) findViewById(R.id.landAltitudeButton);
+        landAltitudeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button AltitudePlusButton = (Button) findViewById(R.id.AltitudePlusButton);
+                Button AltitudeSubtractButton = (Button) findViewById(R.id.AltitudeSubtractButton);
+                State droneState = drone.getAttribute(AttributeType.STATE);
+                    if(AltitudePlusButton.getVisibility()==view.GONE){
+                        AltitudePlusButton.setVisibility(view.VISIBLE);
+                        AltitudeSubtractButton.setVisibility(view.VISIBLE);
+                    }
+                    else{
+                        AltitudePlusButton.setVisibility(view.GONE);
+                        AltitudeSubtractButton.setVisibility(view.GONE);
+                    }
+            }
+        });
+    }
+
+    private void altitudePlus(){
+
+        Button AltitudePlusButton = (Button) findViewById(R.id.AltitudePlusButton);
+        AltitudePlusButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button landAltitudeButton = (Button) findViewById(R.id.landAltitudeButton);
+                if(altitudeState<10){
+                    altitudeState+=0.5;
+                    landAltitudeButton.setText(String.valueOf(altitudeState));
+                }
+
+            }
+        });
+    }
+
+    private void altitudeSubtract(){
+        Button AltitudeSubtractButton = (Button) findViewById(R.id.AltitudeSubtractButton);
+        AltitudeSubtractButton.setOnClickListener(new View.OnClickListener() {
+            Button landAltitudeButton = (Button) findViewById(R.id.landAltitudeButton);
+            @Override
+            public void onClick(View view) {
+                if(altitudeState>3){
+                    altitudeState-=0.5;
+                    landAltitudeButton.setText(String.valueOf(altitudeState));
+                }
+
+            }
+        });
+    }
 
 
 
