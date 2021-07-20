@@ -1,6 +1,9 @@
 package com.viasofts.mygcs;
 
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.SurfaceTexture;
 import android.location.Location;
 import android.location.LocationManager;
@@ -152,39 +155,67 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 }
 
                 else if(vehicleState.isArmed()) {
-                    ControlApi.getApi(drone).takeoff(altitudeState, new AbstractCommandListener() {
-                    @Override
-                    public void onSuccess() {
-                        alertUser("Taking off...");
-                    }
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                    builder.setMessage("지정한 이륙고도까지 기체를 상승합니다.\n안전거리를 유지하세요.").setPositiveButton("확인", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            // FIRE ZE MISSILES!
+                            ControlApi.getApi(drone).takeoff(altitudeState, new AbstractCommandListener() {
+                                @Override
+                                public void onSuccess() {
+                                    alertUser("Taking off...");
+                                }
 
-                    @Override
-                    public void onError(int i) {
-                        alertUser("Unable to take off.");
-                    }
+                                @Override
+                                public void onError(int i) {
+                                    alertUser("Unable to take off.");
+                                }
 
-                    @Override
-                    public void onTimeout() {
-                        alertUser("Unable to take off.");
-                    }
-                    });
-                    DroneStartButton.setText("Land");
+                                @Override
+                                public void onTimeout() {
+                                    alertUser("Unable to take off.");
+                                }
+                            });
+                            DroneStartButton.setText("Land");
+                        }
+                    })
+                            .setNegativeButton("취소", new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int id) {
+                                    // User cancelled the dialog
+                                }
+                            });
+
+                    builder.create().show();
+
+
                 }
 
 
                 else if(vehicleState.isConnected()) {
-                    VehicleApi.getApi(drone).arm(true, false, new SimpleCommandListener() {
-                        @Override
-                        public void onError(int executionError) {
-                            alertUser("Unable to arm vehicle.");
-                        }
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                    builder.setMessage("모터를 가동합니다.\n모터가 고속으로 회전합니다.").setPositiveButton("확인", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            // FIRE ZE MISSILES!
+                            VehicleApi.getApi(drone).arm(true, false, new SimpleCommandListener() {
+                                @Override
+                                public void onError(int executionError) {
+                                    alertUser("Unable to arm vehicle.");
+                                }
 
-                        @Override
-                        public void onTimeout() {
-                            alertUser("Arming operation timed out.");
-                        }
-                    });
-                    DroneStartButton.setText("ARM");
+                                @Override
+                                public void onTimeout() {
+                                    alertUser("Arming operation timed out.");
+                                }
+                            });
+                            DroneStartButton.setText("ARM");
+                            }
+                             })
+                    .setNegativeButton("취소", new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int id) {
+                                    // User cancelled the dialog
+                                }
+                            });
+
+                    builder.create().show();
 
                 }
             }
@@ -201,6 +232,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         super.onStart();
         this.controlTower.connect(this);
         updateVehicleModesForType(this.droneType);
+
     }
 
     @Override
@@ -489,7 +521,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button landAltitudeButton = (Button) findViewById(R.id.landAltitudeButton);
                 if(altitudeState<10){
                     altitudeState+=0.5;
-                    landAltitudeButton.setText(String.valueOf(altitudeState));
+                    landAltitudeButton.setText(String.valueOf(altitudeState)+"m");
                 }
 
             }
@@ -504,13 +536,12 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             public void onClick(View view) {
                 if(altitudeState>3){
                     altitudeState-=0.5;
-                    landAltitudeButton.setText(String.valueOf(altitudeState));
+                    landAltitudeButton.setText(String.valueOf(altitudeState)+"m");
                 }
 
             }
         });
     }
-
 
 
 
