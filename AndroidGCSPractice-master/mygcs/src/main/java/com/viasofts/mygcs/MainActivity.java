@@ -4,9 +4,12 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
@@ -15,6 +18,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
@@ -34,6 +38,8 @@ import com.naver.maps.map.MapFragment;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.OnMapReadyCallback;
 import com.naver.maps.map.overlay.Marker;
+import com.naver.maps.map.overlay.OverlayImage;
+import com.naver.maps.map.overlay.PolylineOverlay;
 import com.o3dr.android.client.ControlTower;
 import com.o3dr.android.client.Drone;
 import com.o3dr.android.client.apis.ControlApi;
@@ -42,11 +48,13 @@ import com.o3dr.android.client.interfaces.DroneListener;
 import com.o3dr.android.client.interfaces.LinkListener;
 import com.o3dr.android.client.interfaces.TowerListener;
 import com.o3dr.android.client.utils.video.MediaCodecManager;
+import com.o3dr.services.android.lib.coordinate.LatLong;
 import com.o3dr.services.android.lib.drone.attribute.AttributeEvent;
 import com.o3dr.services.android.lib.drone.attribute.AttributeType;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloAttributes;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloState;
 import com.o3dr.services.android.lib.drone.connection.ConnectionParameter;
+import com.o3dr.services.android.lib.drone.connection.ConnectionType;
 import com.o3dr.services.android.lib.drone.property.Altitude;
 import com.o3dr.services.android.lib.drone.property.Attitude;
 import com.o3dr.services.android.lib.drone.property.Battery;
@@ -59,7 +67,13 @@ import com.o3dr.services.android.lib.drone.property.VehicleMode;
 import com.o3dr.services.android.lib.gcs.link.LinkConnectionStatus;
 import com.o3dr.services.android.lib.model.AbstractCommandListener;
 import com.o3dr.services.android.lib.model.SimpleCommandListener;
+import com.viasofts.mygcs.activites.helpers.BluetoothDevicesActivity;
+import com.viasofts.mygcs.utils.TLogUtils;
+import com.viasofts.mygcs.utils.prefs.DroidPlannerPrefs;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements DroneListener, TowerListener, LinkListener, OnMapReadyCallback {
@@ -76,10 +90,17 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     //private Spinner modeSelector;
     NaverMap mNaverMap;
     Marker marker = new Marker();
+    Marker guideMarker = new Marker();
     Handler mainHandler;
     Toolbar myToolbar;
     double altitudeState =3.0;
+    LatLng guideLatLng;
+    ConnectionParameter connParams;
+    boolean chacking=false;
 
+    static LatLng mGuidedPoint; //가이드모드 목적지 저장
+    ArrayList<LatLng> dronePointList =new ArrayList<LatLng>();
+    PolylineOverlay polyline = new PolylineOverlay();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -99,6 +120,31 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
         mapFragment.getMapAsync(this);
 
+        final Button blueToothButton = (Button) findViewById(R.id.blueToothButton);
+        blueToothButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                DroidPlannerPrefs mPrefs = DroidPlannerPrefs.getInstance(getApplicationContext());
+
+                String btAddress = mPrefs.getBluetoothDeviceAddress();
+                final @ConnectionType.Type int connectionType = mPrefs.getConnectionParameterType();
+
+                Uri tlogLoggingUri = TLogUtils.getTLogLoggingUri(getApplicationContext(),
+                        connectionType, System.currentTimeMillis());
+
+                final long EVENTS_DISPATCHING_PERIOD = 200L; //MS
+
+                if (TextUtils.isEmpty(btAddress)) {
+                    connParams = null;
+                    startActivity(new Intent(getApplicationContext(), BluetoothDevicesActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                } else {
+                    connParams = ConnectionParameter.newBluetoothConnection(btAddress,
+                            tlogLoggingUri, EVENTS_DISPATCHING_PERIOD);
+                }
+
+
+            }
+        });
 
         final Button button = (Button) findViewById(R.id.connectButton);
         button.setOnClickListener(new View.OnClickListener() {
@@ -111,6 +157,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 } else {
                     ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
                     drone.connect(connectionParams);
+                    /*drone.connect(connParams);*/
                     button.setText("DISCONNECT");
                 }
 
@@ -141,6 +188,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 State vehicleState = drone.getAttribute(AttributeType.STATE);
 
                 if(vehicleState.isFlying()){
+                    DroneStartButton.setText("Land");
                     VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_LAND, new SimpleCommandListener() {
                         @Override
                         public void onError(int executionError) {
@@ -152,10 +200,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                             alertUser("Unable to land the vehicle.");
                         }
                     });
-                    DroneStartButton.setText("Take_OFF");
                 }
 
                 else if(vehicleState.isArmed()) {
+                    DroneStartButton.setText("Take_OFF");
                     AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
                     builder.setMessage("지정한 이륙고도까지 기체를 상승합니다.\n안전거리를 유지하세요.").setPositiveButton("확인", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
@@ -176,7 +224,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                                     alertUser("Unable to take off.");
                                 }
                             });
-                            DroneStartButton.setText("Land");
+
                         }
                     })
                             .setNegativeButton("취소", new DialogInterface.OnClickListener() {
@@ -187,11 +235,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
                     builder.create().show();
 
-
                 }
 
-
                 else if(vehicleState.isConnected()) {
+                    DroneStartButton.setText("ARM");
                     AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
                     builder.setMessage("모터를 가동합니다.\n모터가 고속으로 회전합니다.").setPositiveButton("확인", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
@@ -207,7 +254,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                                     alertUser("Arming operation timed out.");
                                 }
                             });
-                            DroneStartButton.setText("ARM");
                             }
                              })
                     .setNegativeButton("취소", new DialogInterface.OnClickListener() {
@@ -225,7 +271,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         landAltitude();
         altitudePlus();
         altitudeSubtract();
-
+        selectMap();
+        basicMapSelect();
+        satelliteMapSelect();
+        terrainMapSelect();
     }
 
     @Override
@@ -311,6 +360,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 break;
             case AttributeEvent.GPS_POSITION:
                 updateDronePosition();
+                droneLine();
+                if(chacking){
+                    CheckGoal(drone,mGuidedPoint);
+                }
                 break;
             default:
                 // Log.i("DRONE_EVENT", event); //Uncomment to see events from the drone
@@ -371,6 +424,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         updateSpeed();
         updateYaw();
         updateGps();
+        mNaverMap.setOnMapLongClickListener((point,coord) -> {
+            mGuidedPoint = coord;
+            LatLong k = new LatLong(coord.latitude,coord.longitude);
+            DialogSimple(k);
+        });
 
     }
 
@@ -544,9 +602,132 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
+           /* 7.2.5.2 조건
+         * 지도를 long click 하면 클릭한 위치에 목적지 아이콘이 표시되고 가이드 모드를 사용하여
+            기체가 목적지로 이동하게 하세요.
+                    * 기체의 현재 비행모드가 가이드모드가 아닌 경우에는 경고창을 표시하고 확인을 누르면
+            비행모드를 가이드 모드로 전환하고 기체 이동을 수행하세요.
+         * 기체의 현재 비행모드가 가이드 모드인 경우 경고창 표시 없이 목적지 아이콘을 새로운
+            클릭 지점으로 수정하고 바로 기체를 목적지로 이동하세요.
+         * 기체가 목적지에 도착하면 비행모드를 로이터 모드로 전환하고 목적지 아이콘을 제거하세
+            요.
+         * 이동 고도는 기체의 현재 고도를 유지하세요.*/
 
 
 
 
+    public void DialogSimple(LatLong point) {
+        AlertDialog.Builder alt_bld = new AlertDialog.Builder(MainActivity.this);
+        alt_bld.setMessage("확인하시면 가이드모드로 전환후 기체가 이동합니다.").setCancelable(false).setPositiveButton("확인", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                // Action for 'Yes' Button
+                VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_GUIDED,
+                        new AbstractCommandListener() {
+                            @Override
+                            public void onSuccess() {
+                                guideMarker.setPosition(new LatLng(mGuidedPoint.latitude, mGuidedPoint.longitude));
+                                guideMarker.setIconTintColor(Color.YELLOW);
+                                guideMarker.setMap(mNaverMap);
+                                ControlApi.getApi(drone).goTo(point, true, null);
+                                chacking=true;
+                            }
+                            @Override
+                            public void onError(int i) {
+                            }
+                            @Override
+                            public void onTimeout() {
+                            }
+                        });
+            }
+        }).setNegativeButton("취소", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                dialog.cancel();
+            }
+        });
+        AlertDialog alert = alt_bld.create();
+        // Title for AlertDialog
+        alert.setTitle("Title");
+        // Icon for AlertDialog
+
+        alert.show();
+    }
+    public static boolean CheckGoal(final Drone drone, LatLng recentLatLng) {
+        GuidedState guidedState = drone.getAttribute(AttributeType.GUIDED_STATE);
+        LatLng target = new LatLng(guidedState.getCoordinate().getLatitude(),
+                guidedState.getCoordinate().getLongitude());
+        return target.distanceTo(recentLatLng) <= 1;
+    }
+
+    public void droneLine(){
+        Gps linepoint  = this.drone.getAttribute(AttributeType.GPS);
+        double lineLatitude =  linepoint.getPosition().getLatitude();
+        double lineLogitude = linepoint.getPosition().getLongitude();
+
+        Collections.addAll(dronePointList,
+                new LatLng(lineLatitude,lineLogitude)
+        );
+        polyline.setCoords(dronePointList);
+        polyline.setCoords(dronePointList);
+        polyline.setMap(mNaverMap);
+    }
+
+
+    public void selectMap(){
+        Button mapButton = (Button) findViewById(R.id.mapButton);
+        mapButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button basicMapButton = (Button) findViewById(R.id.basicMapButton);
+                Button satelliteMapButton = (Button) findViewById(R.id.satelliteMapButton);
+                Button terrainMapButton = (Button) findViewById(R.id.terrainMapButton);
+                if(basicMapButton.getVisibility()==view.GONE){
+                    basicMapButton.setVisibility(view.VISIBLE);
+                    satelliteMapButton.setVisibility(view.VISIBLE);
+                    terrainMapButton.setVisibility(view.VISIBLE);
+                }
+                else{
+                    basicMapButton.setVisibility(view.GONE);
+                    satelliteMapButton.setVisibility(view.GONE);
+                    terrainMapButton.setVisibility(view.GONE);
+                }
+            }
+        });
+    }
+
+    public  void basicMapSelect(){
+        Button basicMapButton = (Button) findViewById(R.id.basicMapButton);
+        basicMapButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button mapButton = (Button) findViewById(R.id.mapButton);
+                mapButton.setText("일반지도");
+                mNaverMap.setMapType(NaverMap.MapType.Basic);
+            }
+        });
+    }
+
+    public  void satelliteMapSelect(){
+        Button satelliteMapButton = (Button) findViewById(R.id.satelliteMapButton);
+        satelliteMapButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button mapButton = (Button) findViewById(R.id.mapButton);
+                mapButton.setText("위성지도");
+                mNaverMap.setMapType(NaverMap.MapType.Satellite);
+            }
+        });
+    }
+
+    public  void terrainMapSelect(){
+        Button terrainMapButton = (Button) findViewById(R.id.terrainMapButton);
+        terrainMapButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button mapButton = (Button) findViewById(R.id.mapButton);
+                mapButton.setText("지형도");
+                mNaverMap.setMapType(NaverMap.MapType.Terrain);
+            }
+        });
+    }
 
 }
