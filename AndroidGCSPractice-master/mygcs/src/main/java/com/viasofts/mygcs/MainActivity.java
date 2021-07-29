@@ -34,6 +34,7 @@ import com.MAVLink.common.msg_battery_status.*;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.maps.GoogleMap;
 import com.naver.maps.geometry.LatLng;
+import com.naver.maps.map.CameraUpdate;
 import com.naver.maps.map.MapFragment;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.OnMapReadyCallback;
@@ -97,7 +98,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     LatLng guideLatLng;
     ConnectionParameter connParams;
     boolean chacking=false;
-
+    boolean Lockcheck=false;
+    boolean cadastralcheck =false;
     static LatLng mGuidedPoint; //가이드모드 목적지 저장
     ArrayList<LatLng> dronePointList =new ArrayList<LatLng>();
     PolylineOverlay polyline = new PolylineOverlay();
@@ -155,9 +157,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                     drone.disconnect();
                     button.setText("CONNECT");
                 } else {
-                    ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
-                    drone.connect(connectionParams);
-                    /*drone.connect(connParams);*/
+                    /*ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
+                    drone.connect(connectionParams);*/
+                    drone.connect(connParams);
                     button.setText("DISCONNECT");
                 }
 
@@ -268,13 +270,22 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             }
 
         });
+        //초기 고도
         landAltitude();
         altitudePlus();
         altitudeSubtract();
+        //맵 선택 영역
         selectMap();
         basicMapSelect();
         satelliteMapSelect();
         terrainMapSelect();
+
+        //맵보는 영역
+        mapState();
+        mapMove();
+        mapLock();
+        //지적도
+        cadastralMap();
     }
 
     @Override
@@ -361,6 +372,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             case AttributeEvent.GPS_POSITION:
                 updateDronePosition();
                 droneLine();
+                if(Lockcheck){
+                    mapLocking();
+                }
                 if(chacking){
                     CheckGoal(drone,mGuidedPoint);
                 }
@@ -479,7 +493,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
 
     //비행모드
-    public void onFlightModeSelected(View view) {
+    private void onFlightModeSelected(View view) {
         VehicleMode vehicleMode = (VehicleMode) this.modeSelector.getSelectedItem();
         VehicleApi.getApi(this.drone).setVehicleMode(vehicleMode, new
                 AbstractCommandListener() {
@@ -514,9 +528,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         this.modeSelector.setSelection(arrayAdapter.getPosition(vehicleMode));
     }
 
-    //드론의 위치 표시
-    //조건 기체로부터 현재 위치를 위경도 좌표를 받아와 그위칭 드론 아이콘을 표시 (방향성이 있는 이미지를 받아온다)
-    //기체의 YAW에 따라 아이콘의 각도 변경 ,기체의 헤드방향을 이미지와 같이 점선 표시
 
     protected void updateDronePosition(){
         Gps location  = this.drone.getAttribute(AttributeType.GPS);
@@ -533,22 +544,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         marker.setAngle((int)Yaw);
 
     }
-
-    /*7.2.3.2 조건
-         * 모터 가동(ARM), 이륙(TAKE-OFF), 자동착륙(LAND) 버튼을 왼쪽 아래에 만드세요.
-         * 모터 가동, 이륙, 자동착륙 버튼은 하나의 버튼이 기체 상태에 따라 TEXT가 변경되도록
-        하세요.
-         - 대기 중에는 모터 가동 상태
-         - 시동 후에는 이륙 상태
-         - 이륙 후에는 자동착륙 상태
-         - 착륙 후에는 다시 모터 상태
-         * 각 상태에 맞게 버튼의 기능도 변경하세요.
-         * 이륙 고도를 설정할 수 있는 인터페이스를 오른쪽 위에 만드세요.
-         * 이륙고도 설정 버튼을 클릭하면 +0.5, -0.5 버튼이 나타나고 다시 클릭하면 사라지게
-        하세요.
-         * 이륙 고도는 범위는 3m~10m로 설정하고, 0.5씩 증감되도록 하세요.
-         * 이륙고도 인터페이스에서 설정한 값을 기체 이륙 시에 파라미터로 사용하세요*/
-
 
     private void landAltitude(){
 
@@ -602,19 +597,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-           /* 7.2.5.2 조건
-         * 지도를 long click 하면 클릭한 위치에 목적지 아이콘이 표시되고 가이드 모드를 사용하여
-            기체가 목적지로 이동하게 하세요.
-                    * 기체의 현재 비행모드가 가이드모드가 아닌 경우에는 경고창을 표시하고 확인을 누르면
-            비행모드를 가이드 모드로 전환하고 기체 이동을 수행하세요.
-         * 기체의 현재 비행모드가 가이드 모드인 경우 경고창 표시 없이 목적지 아이콘을 새로운
-            클릭 지점으로 수정하고 바로 기체를 목적지로 이동하세요.
-         * 기체가 목적지에 도착하면 비행모드를 로이터 모드로 전환하고 목적지 아이콘을 제거하세
-            요.
-         * 이동 고도는 기체의 현재 고도를 유지하세요.*/
-
-
-
 
     public void DialogSimple(LatLong point) {
         AlertDialog.Builder alt_bld = new AlertDialog.Builder(MainActivity.this);
@@ -658,7 +640,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         return target.distanceTo(recentLatLng) <= 1;
     }
 
-    public void droneLine(){
+    private void droneLine(){
         Gps linepoint  = this.drone.getAttribute(AttributeType.GPS);
         double lineLatitude =  linepoint.getPosition().getLatitude();
         double lineLogitude = linepoint.getPosition().getLongitude();
@@ -671,8 +653,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         polyline.setMap(mNaverMap);
     }
 
-
-    public void selectMap(){
+    private void selectMap(){
         Button mapButton = (Button) findViewById(R.id.mapButton);
         mapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -694,7 +675,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    public  void basicMapSelect(){
+    private void basicMapSelect(){
         Button basicMapButton = (Button) findViewById(R.id.basicMapButton);
         basicMapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -706,7 +687,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    public  void satelliteMapSelect(){
+    private void satelliteMapSelect(){
         Button satelliteMapButton = (Button) findViewById(R.id.satelliteMapButton);
         satelliteMapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -718,7 +699,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    public  void terrainMapSelect(){
+    private void terrainMapSelect(){
         Button terrainMapButton = (Button) findViewById(R.id.terrainMapButton);
         terrainMapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -726,6 +707,80 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button mapButton = (Button) findViewById(R.id.mapButton);
                 mapButton.setText("지형도");
                 mNaverMap.setMapType(NaverMap.MapType.Terrain);
+            }
+        });
+    }
+
+    private void mapState(){
+        Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
+        mapStateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button mapMoveButton = (Button) findViewById(R.id.mapMoveButton);
+                Button mapLockButton = (Button) findViewById(R.id.mapLockButton);
+
+                if(mapMoveButton.getVisibility()==view.GONE){
+                    mapMoveButton.setVisibility(view.VISIBLE);
+                    mapLockButton.setVisibility(view.VISIBLE);
+                }
+                else{
+                    mapMoveButton.setVisibility(view.GONE);
+                    mapLockButton.setVisibility(view.GONE);
+                }
+            }
+        });
+    }
+
+    private void mapMove(){
+        Button mapMoveButton = (Button) findViewById(R.id.mapMoveButton);
+        mapMoveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
+                mapStateButton.setText("맵 이동");
+                Lockcheck=false;
+            }
+        });
+    }
+
+    private void mapLock(){
+        Button mapLockButton = (Button) findViewById(R.id.mapLockButton);
+        mapLockButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
+                mapStateButton.setText("맵 잠금");
+                Lockcheck=true;
+            }
+        });
+    }
+
+    private void mapLocking(){
+        Gps mapLocking  = this.drone.getAttribute(AttributeType.GPS);
+        double lockingLatitude =  mapLocking.getPosition().getLatitude();
+        double lockingLogitude = mapLocking.getPosition().getLongitude();
+
+        CameraUpdate cameraUpdate = CameraUpdate.scrollTo(new LatLng(lockingLatitude, lockingLogitude));
+        mNaverMap.moveCamera(cameraUpdate);
+
+    }
+
+    private void cadastralMap(){
+        Button cadastralMapButton = (Button) findViewById(R.id.cadastralMapButton);
+        cadastralMapButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(cadastralcheck){
+                    mNaverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, false);
+                    cadastralMapButton.setText("지적도 OFF");
+                    cadastralcheck=false;
+                }
+
+                else{
+                    mNaverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, true);
+                    cadastralMapButton.setText("지적도 ON");
+                    cadastralcheck=true;
+                }
             }
         });
     }
