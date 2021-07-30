@@ -150,22 +150,34 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
         final Button button = (Button) findViewById(R.id.connectButton);
         button.setOnClickListener(new View.OnClickListener() {
-
             @Override
             public void onClick(View view) {
                 if (drone.isConnected()) {
                     drone.disconnect();
                     button.setText("CONNECT");
                 } else {
-                    /*ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
-                    drone.connect(connectionParams);*/
-                    drone.connect(connParams);
-                    button.setText("DISCONNECT");
-                }
+                    AlertDialog.Builder alt_bld = new AlertDialog.Builder(MainActivity.this);
+                    alt_bld.setMessage("드론 통신방식을 선택해 주세요").setCancelable(false).setPositiveButton("UDP", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
+                            drone.connect(connectionParams);
+                            button.setText("DISCONNECT");
+                        }
+                    }).setNegativeButton("blueTooth", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            drone.connect(connParams);
+                            button.setText("DISCONNECT");
+                        }
+                    });
+                    AlertDialog alert = alt_bld.create();
+                    // Title for AlertDialog
+                    alert.setTitle("Title");
+                    // Icon for AlertDialog
+                    alert.show();
 
+                }
             }
         });
-
 
         this.modeSelector = (Spinner) findViewById(R.id.modeSelect);
         this.modeSelector.setOnItemSelectedListener(new Spinner.OnItemSelectedListener() {
@@ -440,8 +452,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         updateGps();
         mNaverMap.setOnMapLongClickListener((point,coord) -> {
             mGuidedPoint = coord;
-            LatLong k = new LatLong(coord.latitude,coord.longitude);
-            DialogSimple(k);
+            LatLong lpoint = new LatLong(coord.latitude,coord.longitude);
+            DialogSimple(lpoint);
         });
 
     }
@@ -599,39 +611,49 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
 
     public void DialogSimple(LatLong point) {
-        AlertDialog.Builder alt_bld = new AlertDialog.Builder(MainActivity.this);
-        alt_bld.setMessage("확인하시면 가이드모드로 전환후 기체가 이동합니다.").setCancelable(false).setPositiveButton("확인", new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int id) {
-                // Action for 'Yes' Button
-                VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_GUIDED,
-                        new AbstractCommandListener() {
-                            @Override
-                            public void onSuccess() {
-                                guideMarker.setPosition(new LatLng(mGuidedPoint.latitude, mGuidedPoint.longitude));
-                                guideMarker.setIconTintColor(Color.YELLOW);
-                                guideMarker.setMap(mNaverMap);
-                                ControlApi.getApi(drone).goTo(point, true, null);
-                                chacking=true;
-                            }
-                            @Override
-                            public void onError(int i) {
-                            }
-                            @Override
-                            public void onTimeout() {
-                            }
-                        });
-            }
-        }).setNegativeButton("취소", new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int id) {
-                dialog.cancel();
-            }
-        });
-        AlertDialog alert = alt_bld.create();
-        // Title for AlertDialog
-        alert.setTitle("Title");
-        // Icon for AlertDialog
+        State vehicleState = this.drone.getAttribute(AttributeType.STATE);
+        if(vehicleState.getVehicleMode()==VehicleMode.COPTER_GUIDED){
+            guideMarker.setPosition(new LatLng(mGuidedPoint.latitude, mGuidedPoint.longitude));
+            guideMarker.setIconTintColor(Color.YELLOW);
+            guideMarker.setMap(mNaverMap);
+            ControlApi.getApi(drone).goTo(point, true, null);
+            chacking=true;
 
-        alert.show();
+        }
+        else{
+            AlertDialog.Builder alt_bld = new AlertDialog.Builder(MainActivity.this);
+            alt_bld.setMessage("확인하시면 가이드모드로 전환후 기체가 이동합니다.").setCancelable(false).setPositiveButton("확인", new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    // Action for 'Yes' Button
+                    VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_GUIDED,
+                            new AbstractCommandListener() {
+                                @Override
+                                public void onSuccess() {
+                                    guideMarker.setPosition(new LatLng(mGuidedPoint.latitude, mGuidedPoint.longitude));
+                                    guideMarker.setIconTintColor(Color.YELLOW);
+                                    guideMarker.setMap(mNaverMap);
+                                    ControlApi.getApi(drone).goTo(point, true, null);
+                                    chacking=true;
+                                }
+                                @Override
+                                public void onError(int i) {
+                                }
+                                @Override
+                                public void onTimeout() {
+                                }
+                            });
+                }
+            }).setNegativeButton("취소", new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    dialog.cancel();
+                }
+            });
+            AlertDialog alert = alt_bld.create();
+            // Title for AlertDialog
+            alert.setTitle("Title");
+            // Icon for AlertDialog
+            alert.show();
+        }
     }
     public static boolean CheckGoal(final Drone drone, LatLng recentLatLng) {
         GuidedState guidedState = drone.getAttribute(AttributeType.GUIDED_STATE);
