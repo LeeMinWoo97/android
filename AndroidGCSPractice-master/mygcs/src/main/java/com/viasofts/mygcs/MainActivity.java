@@ -16,6 +16,8 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -26,6 +28,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -103,6 +106,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     static LatLng mGuidedPoint; //가이드모드 목적지 저장
     ArrayList<LatLng> dronePointList =new ArrayList<LatLng>();
     PolylineOverlay polyline = new PolylineOverlay();
+
+    // recyclerView
+    private ArrayList <String> recyclerlist = new ArrayList<>();
+    Adapter adapter = new Adapter(recyclerlist);
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -162,11 +170,15 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                             ConnectionParameter connectionParams = ConnectionParameter.newUdpConnection(null);
                             drone.connect(connectionParams);
                             button.setText("DISCONNECT");
+                            recyclerlist.add(" 드론과 연결 되었습니다.");
+                            arrayAdepter();
                         }
                     }).setNegativeButton("blueTooth", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
                             drone.connect(connParams);
                             button.setText("DISCONNECT");
+                            recyclerlist.add(" 드론과 연결이 끊어졌습니다.");
+                            arrayAdepter();
                         }
                     });
                     AlertDialog alert = alt_bld.create();
@@ -205,6 +217,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                     DroneStartButton.setText("Land");
                     VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_LAND, new SimpleCommandListener() {
                         @Override
+                        public void onSuccess() {
+                            recyclerlist.add("착륙 합니다.");
+                            arrayAdepter();
+                        }
+                        @Override
                         public void onError(int executionError) {
                             alertUser("Unable to land the vehicle.");
                         }
@@ -226,6 +243,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                                 @Override
                                 public void onSuccess() {
                                     alertUser("Taking off...");
+                                    recyclerlist.add("이륙 합니다.");
+                                    arrayAdepter();
                                 }
 
                                 @Override
@@ -258,6 +277,12 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                         public void onClick(DialogInterface dialog, int id) {
                             // FIRE ZE MISSILES!
                             VehicleApi.getApi(drone).arm(true, false, new SimpleCommandListener() {
+                                @Override
+                                public void onSuccess() {
+                                    recyclerlist.add("모터를 가동합니다.");
+                                    arrayAdepter();
+                                }
+
                                 @Override
                                 public void onError(int executionError) {
                                     alertUser("Unable to arm vehicle.");
@@ -298,6 +323,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         mapLock();
         //지적도
         cadastralMap();
+
+        allClear();
+
+
+
     }
 
     @Override
@@ -566,13 +596,13 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button AltitudePlusButton = (Button) findViewById(R.id.AltitudePlusButton);
                 Button AltitudeSubtractButton = (Button) findViewById(R.id.AltitudeSubtractButton);
                 State droneState = drone.getAttribute(AttributeType.STATE);
-                    if(AltitudePlusButton.getVisibility()==view.GONE){
+                    if(AltitudePlusButton.getVisibility()==view.INVISIBLE){
                         AltitudePlusButton.setVisibility(view.VISIBLE);
                         AltitudeSubtractButton.setVisibility(view.VISIBLE);
                     }
                     else{
-                        AltitudePlusButton.setVisibility(view.GONE);
-                        AltitudeSubtractButton.setVisibility(view.GONE);
+                        AltitudePlusButton.setVisibility(view.INVISIBLE);
+                        AltitudeSubtractButton.setVisibility(view.INVISIBLE);
                     }
             }
         });
@@ -618,6 +648,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             guideMarker.setMap(mNaverMap);
             ControlApi.getApi(drone).goTo(point, true, null);
             chacking=true;
+            recyclerlist.add(mGuidedPoint.latitude+" "+mGuidedPoint.longitude+"위치로 이동합니다.");
+            arrayAdepter();
 
         }
         else{
@@ -634,6 +666,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                                     guideMarker.setMap(mNaverMap);
                                     ControlApi.getApi(drone).goTo(point, true, null);
                                     chacking=true;
+                                    recyclerlist.add(mGuidedPoint.latitude+" "+mGuidedPoint.longitude+"위치로 이동합니다.");
+                                    arrayAdepter();
                                 }
                                 @Override
                                 public void onError(int i) {
@@ -683,15 +717,15 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button basicMapButton = (Button) findViewById(R.id.basicMapButton);
                 Button satelliteMapButton = (Button) findViewById(R.id.satelliteMapButton);
                 Button terrainMapButton = (Button) findViewById(R.id.terrainMapButton);
-                if(basicMapButton.getVisibility()==view.GONE){
+                if(basicMapButton.getVisibility()==view.INVISIBLE){
                     basicMapButton.setVisibility(view.VISIBLE);
                     satelliteMapButton.setVisibility(view.VISIBLE);
                     terrainMapButton.setVisibility(view.VISIBLE);
                 }
                 else{
-                    basicMapButton.setVisibility(view.GONE);
-                    satelliteMapButton.setVisibility(view.GONE);
-                    terrainMapButton.setVisibility(view.GONE);
+                    basicMapButton.setVisibility(view.INVISIBLE);
+                    satelliteMapButton.setVisibility(view.INVISIBLE);
+                    terrainMapButton.setVisibility(view.INVISIBLE);
                 }
             }
         });
@@ -741,13 +775,13 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button mapMoveButton = (Button) findViewById(R.id.mapMoveButton);
                 Button mapLockButton = (Button) findViewById(R.id.mapLockButton);
 
-                if(mapMoveButton.getVisibility()==view.GONE){
+                if(mapMoveButton.getVisibility()==view.INVISIBLE){
                     mapMoveButton.setVisibility(view.VISIBLE);
                     mapLockButton.setVisibility(view.VISIBLE);
                 }
                 else{
-                    mapMoveButton.setVisibility(view.GONE);
-                    mapLockButton.setVisibility(view.GONE);
+                    mapMoveButton.setVisibility(view.INVISIBLE);
+                    mapLockButton.setVisibility(view.INVISIBLE);
                 }
             }
         });
@@ -761,6 +795,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
                 mapStateButton.setText("맵 이동");
                 Lockcheck=false;
+                recyclerlist.add("맵을 이동할 수 있는 상태입니다.");
+                arrayAdepter();
             }
         });
     }
@@ -773,6 +809,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
                 mapStateButton.setText("맵 잠금");
                 Lockcheck=true;
+                recyclerlist.add("맵을 이동할 수 없는 상태입니다.");
+                arrayAdepter();
             }
         });
     }
@@ -806,5 +844,32 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             }
         });
     }
+
+    private void arrayAdepter(){
+        // arrayadepter
+
+        RecyclerView listView = findViewById(R.id.recyclerView);
+        listView.setLayoutManager(new LinearLayoutManager(this));
+        listView.setAdapter(adapter);
+
+    }
+
+    private void allClear(){
+        Button clearAllButton = (Button) findViewById(R.id.clearAllButton);
+        clearAllButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                recyclerlist.clear();
+                arrayAdepter();
+                polyline.setMap(null);
+                Gps stopGps = drone.getAttribute(AttributeType.GPS);
+                LatLong point=stopGps.getPosition();
+                ControlApi.getApi(drone).goTo(point, true, null);
+                chacking=false;
+                guideMarker.setMap(null);
+            }
+        });
+    }
+
 
 }
