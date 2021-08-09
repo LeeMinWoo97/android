@@ -48,6 +48,14 @@
             app:layout_constraintStart_toEndOf="@+id/TextViewVoltage"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <Spinner
+            android:id="@+id/modeSelect"
+            android:layout_width="119dp"
+            android:layout_height="match_parent"
+            android:layout_column="1"
+            app:layout_constraintStart_toEndOf="@+id/TextViewFlyingType"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <TextView
             android:id="@+id/TextViewAltitude"
             android:layout_width="123dp"
@@ -82,14 +90,6 @@
             android:gravity="left"
             android:text="TextViewGps"
             app:layout_constraintStart_toEndOf="@+id/TextViewYaw"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <Spinner
-            android:id="@+id/modeSelect"
-            android:layout_width="123dp"
-            android:layout_height="25dp"
-            android:layout_column="1"
-            app:layout_constraintStart_toEndOf="@+id/TextViewFlyingType"
             app:layout_constraintTop_toTopOf="parent" />
 
     </LinearLayout>
@@ -279,6 +279,65 @@
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:text="취소"
+            android:visibility="invisible" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/linearLayout"
+        android:layout_width="60dp"
+        android:layout_height="180dp"
+        android:layout_marginEnd="10dp"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toStartOf="@+id/landAltitudeLayout"
+        app:layout_constraintTop_toBottomOf="@+id/infoLayout">
+
+        <Button
+            android:id="@+id/flightWidthbutton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:text="비행폭" />
+
+        <Button
+            android:id="@+id/widthIncreasebutton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:text="+0.5"
+            android:visibility="invisible" />
+
+        <Button
+            android:id="@+id/widthDecreasebutton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:text="-0.5"
+            android:visibility="invisible" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="60dp"
+        android:layout_height="180dp"
+        android:layout_marginEnd="10dp"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toStartOf="@+id/linearLayout"
+        app:layout_constraintTop_toBottomOf="@+id/infoLayout">
+
+        <Button
+            android:id="@+id/ABdistancebutton"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:text="AB거리" />
+
+        <Button
+            android:id="@+id/distanceIncresebutton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:text="+10"
+            android:visibility="invisible" />
+
+        <Button
+            android:id="@+id/distanceDecreasebutton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:text="-10"
             android:visibility="invisible" />
     </LinearLayout>
 

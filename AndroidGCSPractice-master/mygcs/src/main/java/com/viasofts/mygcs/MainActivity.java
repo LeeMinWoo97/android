@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.PointF;
 import android.graphics.SurfaceTexture;
 import android.location.Location;
 import android.location.LocationManager;
@@ -80,10 +81,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static com.o3dr.services.android.lib.util.MathUtils.getArcInRadians;
+
 public class MainActivity extends AppCompatActivity implements DroneListener, TowerListener, LinkListener, OnMapReadyCallback {
 
     private static final String TAG = MainActivity.class.getSimpleName();
-
+    //직선의 거리 구하기
+    private static final double RADIUS_OF_EARTH_IN_METERS = 6378137.0;
     private Drone drone;
     private int droneType = Type.TYPE_UNKNOWN;
     private ControlTower controlTower;
@@ -96,20 +100,33 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     Marker marker = new Marker();
     Marker guideMarker = new Marker();
     Handler mainHandler;
-    Toolbar myToolbar;
+
+    Marker pointA = new Marker();
+    Marker pointB = new Marker();
+
     double altitudeState =3.0;
-    LatLng guideLatLng;
+    double flightWidth = 3.0;
+    int ABdistance = 30;
+
     ConnectionParameter connParams;
+
     boolean chacking=false;
     boolean Lockcheck=false;
     boolean cadastralcheck =false;
+    boolean setPointAB = false;
+    boolean selectAB =false;
+
     static LatLng mGuidedPoint; //가이드모드 목적지 저장
     ArrayList<LatLng> dronePointList =new ArrayList<LatLng>();
     PolylineOverlay polyline = new PolylineOverlay();
-
+    PolylineOverlay polylineAB = new PolylineOverlay();
     // recyclerView
     private ArrayList <String> recyclerlist = new ArrayList<>();
     Adapter adapter = new Adapter(recyclerlist);
+    //AB위치 정보 저장
+    LatLong coordPointA ;
+    LatLong coordPointB ;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -307,6 +324,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             }
 
         });
+        buttoncreate();
+    }
+
+    private void buttoncreate(){
         //초기 고도
         landAltitude();
         altitudePlus();
@@ -325,7 +346,21 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         cadastralMap();
 
         allClear();
+        //임무 버튼 생성
+        missionButton();
+        clickButtonAB();
+        clickButtonPolygone();
+        clickCancel();
 
+        //비행폭 버튼
+        flightWidth();
+        flightWidthPlus();
+        flightWidthSubtract();
+
+        //AB거리
+        ABdistance();
+        ABdistancePlus();
+        ABdistanceSubtract();
 
 
     }
@@ -486,7 +521,31 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             DialogSimple(lpoint);
         });
 
+        mNaverMap.setOnMapClickListener((point, coord) -> {
+            if(selectAB) {
+                if (setPointAB) {
+                    pointB.setPosition(coord);
+                    pointB.setIconTintColor(Color.BLUE);
+                    pointB.setMap(mNaverMap);
+                    setPointAB = false;
+                    coordPointB =new LatLong(coord.latitude,coord.longitude);
+                    drawingAB();
+
+                } else {
+                    pointA.setPosition(coord);
+                    pointA.setIconTintColor(Color.RED);
+                    pointA.setMap(mNaverMap);
+                    setPointAB = true;
+                    coordPointA=new LatLong(coord.latitude,coord.longitude);;
+                    drawingAB();
+                }
+            }
+        });
+
+
     }
+
+
 
     //전압 txet출력
     protected void updateVoltage() {
@@ -595,7 +654,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             public void onClick(View view) {
                 Button AltitudePlusButton = (Button) findViewById(R.id.AltitudePlusButton);
                 Button AltitudeSubtractButton = (Button) findViewById(R.id.AltitudeSubtractButton);
-                State droneState = drone.getAttribute(AttributeType.STATE);
                     if(AltitudePlusButton.getVisibility()==view.INVISIBLE){
                         AltitudePlusButton.setVisibility(view.VISIBLE);
                         AltitudeSubtractButton.setVisibility(view.VISIBLE);
@@ -871,5 +929,218 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
+    private void missionButton(){
+        Button missionButton = (Button) findViewById(R.id.missionButton);
+        missionButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button lineABButton = (Button) findViewById(R.id.lineABButton);
+                Button polygoneButton = (Button) findViewById(R.id.polygoneButton);
+                Button cancelbutton = (Button) findViewById(R.id.cancelbutton);
+
+                if(lineABButton.getVisibility()==view.INVISIBLE){
+                    lineABButton.setVisibility(view.VISIBLE);
+                    polygoneButton.setVisibility(view.VISIBLE);
+                    cancelbutton.setVisibility(view.VISIBLE);
+                }
+                else{
+                    lineABButton.setVisibility(view.INVISIBLE);
+                    polygoneButton.setVisibility(view.INVISIBLE);
+                    cancelbutton.setVisibility(view.INVISIBLE);
+                }
+            }
+        });
+    }
+
+    private void clickButtonAB(){
+        Button lineABButton = (Button) findViewById(R.id.lineABButton);
+        lineABButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button missionButton = (Button) findViewById(R.id.missionButton);
+                missionButton.setText("AB");
+                buttonClose(view);
+                selectAB=true;
+            }
+         });
+    }
+
+    private void clickButtonPolygone(){
+        Button polygoneButton = (Button) findViewById(R.id.polygoneButton);
+        polygoneButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button missionButton = (Button) findViewById(R.id.missionButton);
+                missionButton.setText("다각형");
+                buttonClose(view);
+            }
+        });
+    }
+
+    private void clickCancel(){
+        Button cancelbutton = (Button) findViewById(R.id.cancelbutton);
+        cancelbutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button missionButton = (Button) findViewById(R.id.missionButton);
+                missionButton.setText("취소");
+                buttonClose(view);
+
+            }
+        });
+    }
+
+
+    private void buttonClose(View view){
+        Button lineABButton = (Button) findViewById(R.id.lineABButton);
+        Button polygoneButton = (Button) findViewById(R.id.polygoneButton);
+        Button cancelbutton = (Button) findViewById(R.id.cancelbutton);
+        lineABButton.setVisibility(view.INVISIBLE);
+        polygoneButton.setVisibility(view.INVISIBLE);
+        cancelbutton.setVisibility(view.INVISIBLE);
+    }
+
+    //비행폭 초기값 설정 버튼
+    private void flightWidth(){
+
+        Button flightWidthbutton = (Button) findViewById(R.id.flightWidthbutton);
+        flightWidthbutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button widthIncreasebutton = (Button) findViewById(R.id.widthIncreasebutton);
+                Button widthDecreasebutton = (Button) findViewById(R.id.widthDecreasebutton);
+                if(widthIncreasebutton.getVisibility()==view.INVISIBLE){
+                    widthIncreasebutton.setVisibility(view.VISIBLE);
+                    widthDecreasebutton.setVisibility(view.VISIBLE);
+                }
+                else{
+                    widthIncreasebutton.setVisibility(view.INVISIBLE);
+                    widthDecreasebutton.setVisibility(view.INVISIBLE);
+                }
+            }
+        });
+    }
+
+    private void flightWidthPlus(){
+
+        Button widthIncreasebutton = (Button) findViewById(R.id.widthIncreasebutton);
+        widthIncreasebutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button flightWidthbutton = (Button) findViewById(R.id.flightWidthbutton);
+                if(flightWidth<10){
+                    flightWidth+=0.5;
+                    flightWidthbutton.setText(String.valueOf(flightWidth)+"m" + "비행폭");
+                }
+
+            }
+        });
+    }
+
+    private void flightWidthSubtract(){
+        Button widthDecreasebutton = (Button) findViewById(R.id.widthDecreasebutton);
+        widthDecreasebutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button flightWidthbutton = (Button) findViewById(R.id.flightWidthbutton);
+                if(flightWidth>3){
+                    flightWidth-=0.5;
+                    flightWidthbutton.setText(String.valueOf(flightWidth)+"m"+"비행폭");
+                }
+
+            }
+        });
+    }
+
+    //AB거리 초기값 설정 버튼
+    private void ABdistance(){
+        Button ABdistancebutton = (Button) findViewById(R.id.ABdistancebutton);
+        ABdistancebutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button distanceIncresebutton = (Button) findViewById(R.id.distanceIncresebutton);
+                Button distanceDecreasebutton = (Button) findViewById(R.id.distanceDecreasebutton);
+                if(distanceIncresebutton.getVisibility()==view.INVISIBLE){
+                    distanceIncresebutton.setVisibility(view.VISIBLE);
+                    distanceDecreasebutton.setVisibility(view.VISIBLE);
+                }
+                else{
+                    distanceIncresebutton.setVisibility(view.INVISIBLE);
+                    distanceDecreasebutton.setVisibility(view.INVISIBLE);
+                }
+            }
+        });
+    }
+
+    private void ABdistancePlus(){
+
+        Button distanceIncresebutton = (Button) findViewById(R.id.distanceIncresebutton);
+        distanceIncresebutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button ABdistancebutton = (Button) findViewById(R.id.ABdistancebutton);
+                if(ABdistance<100){
+                    ABdistance+=10;
+                    ABdistancebutton.setText(String.valueOf(ABdistance)+"m"+"AB");
+                }
+
+            }
+        });
+    }
+
+    private void ABdistanceSubtract(){
+        Button distanceDecreasebutton = (Button) findViewById(R.id.distanceDecreasebutton);
+        distanceDecreasebutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Button ABdistancebutton = (Button) findViewById(R.id.ABdistancebutton);
+                if(ABdistance>30){
+                    ABdistance-=10;
+                    ABdistancebutton.setText(String.valueOf(ABdistance)+"m"+"AB");
+                }
+
+            }
+        });
+    }
+
+
+    private void drawingAB(){
+        if((coordPointA!=null)&&(coordPointB!=null)){
+            getDistance2D(coordPointA,coordPointB);
+            polylineAB.setMap(null);
+            polylineAB.setCoords(Arrays.asList(
+                    new LatLng(coordPointA.getLatitude(),coordPointA.getLongitude()),
+                    new LatLng(coordPointB.getLatitude(), coordPointB.getLongitude())
+
+            ));
+            polylineAB.setColor(Color.YELLOW);
+            polylineAB.setWidth(15);
+            polylineAB.setMap(mNaverMap);
+        }
+
+    }
+    //두점 사이의 거리
+    public static double getDistance2D(LatLong from, LatLong to) {
+        if (from == null || to == null) {
+            return -1;
+        }
+
+        return RADIUS_OF_EARTH_IN_METERS * Math.toRadians(getArcInRadians(from, to));
+    }
+
+    public static LatLong addDistance(LatLong from, double xMeters, double yMeters) {
+        double lat = from.getLatitude();
+        double lon = from.getLongitude();
+
+        // Coordinate offsets in radians
+        double dLat = yMeters / RADIUS_OF_EARTH_IN_METERS;
+        double dLon = xMeters / (RADIUS_OF_EARTH_IN_METERS * Math.cos(Math.PI * lat / 180));
+
+        // OffsetPosition, decimal degrees
+        double latO = lat + dLat * 180 / Math.PI;
+        double lonO = lon + dLon * 180 / Math.PI;
+
+        return new LatLong(latO, lonO);
+    }
 
 }
