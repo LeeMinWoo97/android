@@ -1106,7 +1106,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     private void drawingAB(){
         if((coordPointA!=null)&&(coordPointB!=null)){
-            getDistance2D(coordPointA,coordPointB);
             polylineAB.setMap(null);
             polylineAB.setCoords(Arrays.asList(
                     new LatLng(coordPointA.getLatitude(),coordPointA.getLongitude()),
@@ -1128,6 +1127,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         return RADIUS_OF_EARTH_IN_METERS * Math.toRadians(getArcInRadians(from, to));
     }
 
+
     public static LatLong addDistance(LatLong from, double xMeters, double yMeters) {
         double lat = from.getLatitude();
         double lon = from.getLongitude();
@@ -1142,5 +1142,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
         return new LatLong(latO, lonO);
     }
+
+
+
 
 }
