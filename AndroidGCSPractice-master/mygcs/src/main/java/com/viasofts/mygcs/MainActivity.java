@@ -72,6 +72,7 @@ import com.o3dr.services.android.lib.drone.property.VehicleMode;
 import com.o3dr.services.android.lib.gcs.link.LinkConnectionStatus;
 import com.o3dr.services.android.lib.model.AbstractCommandListener;
 import com.o3dr.services.android.lib.model.SimpleCommandListener;
+import com.o3dr.services.android.lib.util.MathUtils;
 import com.viasofts.mygcs.activites.helpers.BluetoothDevicesActivity;
 import com.viasofts.mygcs.utils.TLogUtils;
 import com.viasofts.mygcs.utils.prefs.DroidPlannerPrefs;
@@ -118,6 +119,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     static LatLng mGuidedPoint; //가이드모드 목적지 저장
     ArrayList<LatLng> dronePointList =new ArrayList<LatLng>();
+    ArrayList<LatLng> drawLien = new ArrayList<>();
     PolylineOverlay polyline = new PolylineOverlay();
     PolylineOverlay polylineAB = new PolylineOverlay();
     // recyclerView
@@ -763,7 +765,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 new LatLng(lineLatitude,lineLogitude)
         );
         polyline.setCoords(dronePointList);
-        polyline.setCoords(dronePointList);
         polyline.setMap(mNaverMap);
     }
 
@@ -1106,44 +1107,51 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     private void drawingAB(){
         if((coordPointA!=null)&&(coordPointB!=null)){
+            drawLien.clear();
             polylineAB.setMap(null);
-            polylineAB.setCoords(Arrays.asList(
+            Collections.addAll(drawLien,
                     new LatLng(coordPointA.getLatitude(),coordPointA.getLongitude()),
                     new LatLng(coordPointB.getLatitude(), coordPointB.getLongitude())
+            );
+            int checking=1;
+            while(ABdistance>flightWidth*checking){
+                if(checking%2==1){
+                    Double tempAngleB = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
+                    LatLong lineAddB=MathUtils.newCoordFromBearingAndDistance(coordPointB,90 + tempAngleB,flightWidth*checking);
+                    Collections.addAll(drawLien,
+                            new LatLng(lineAddB.getLatitude(),lineAddB.getLongitude())
+                    );
+                    Double tempAngleA = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
+                    LatLong lineAddA =MathUtils.newCoordFromBearingAndDistance(coordPointA,90 + tempAngleA,flightWidth*checking);
+                    Collections.addAll(drawLien,
+                            new LatLng(lineAddA.getLatitude(),lineAddA.getLongitude())
+                    );
+                }
+                else{
+                    Double tempAngleA = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
+                    LatLong lineAddA =MathUtils.newCoordFromBearingAndDistance(coordPointA,90 + tempAngleA,flightWidth*checking);
+                    Collections.addAll(drawLien,
+                            new LatLng(lineAddA.getLatitude(),lineAddA.getLongitude())
+                    );
+                    Double tempAngleB = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
+                    LatLong lineAddB=MathUtils.newCoordFromBearingAndDistance(coordPointB,90 + tempAngleB,flightWidth*checking);
+                    Collections.addAll(drawLien,
+                            new LatLng(lineAddB.getLatitude(),lineAddB.getLongitude())
+                    );
 
-            ));
+                }
+                checking++;
+            }
+            polylineAB.setCoords(drawLien);
             polylineAB.setColor(Color.YELLOW);
             polylineAB.setWidth(15);
             polylineAB.setMap(mNaverMap);
+            for(int i=drawLien.size();i>0;i--){
+                LatLong dronGoingPoint = new LatLong(drawLien.get(i).latitude,drawLien.get(i).longitude);
+                ControlApi.getApi(drone).goTo(dronGoingPoint, true, null);
+           }
         }
 
     }
-    //두점 사이의 거리
-    public static double getDistance2D(LatLong from, LatLong to) {
-        if (from == null || to == null) {
-            return -1;
-        }
-
-        return RADIUS_OF_EARTH_IN_METERS * Math.toRadians(getArcInRadians(from, to));
-    }
-
-
-    public static LatLong addDistance(LatLong from, double xMeters, double yMeters) {
-        double lat = from.getLatitude();
-        double lon = from.getLongitude();
-
-        // Coordinate offsets in radians
-        double dLat = yMeters / RADIUS_OF_EARTH_IN_METERS;
-        double dLon = xMeters / (RADIUS_OF_EARTH_IN_METERS * Math.cos(Math.PI * lat / 180));
-
-        // OffsetPosition, decimal degrees
-        double latO = lat + dLat * 180 / Math.PI;
-        double lonO = lon + dLon * 180 / Math.PI;
-
-        return new LatLong(latO, lonO);
-    }
-
-
-
 
 }
