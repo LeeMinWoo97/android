@@ -341,5 +341,14 @@
             android:visibility="invisible" />
     </LinearLayout>
 
+    <Button
+        android:id="@+id/ABMissionButton"
+        android:layout_width="160dp"
+        android:layout_height="50dp"
+        android:layout_marginEnd="20dp"
+        android:text="ABMission"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/cadastralMapButton" />
+
 
 </android.support.constraint.ConstraintLayout>

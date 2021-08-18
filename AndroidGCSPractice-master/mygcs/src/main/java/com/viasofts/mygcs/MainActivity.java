@@ -48,18 +48,22 @@ import com.naver.maps.map.overlay.PolylineOverlay;
 import com.o3dr.android.client.ControlTower;
 import com.o3dr.android.client.Drone;
 import com.o3dr.android.client.apis.ControlApi;
+import com.o3dr.android.client.apis.MissionApi;
 import com.o3dr.android.client.apis.VehicleApi;
 import com.o3dr.android.client.interfaces.DroneListener;
 import com.o3dr.android.client.interfaces.LinkListener;
 import com.o3dr.android.client.interfaces.TowerListener;
 import com.o3dr.android.client.utils.video.MediaCodecManager;
 import com.o3dr.services.android.lib.coordinate.LatLong;
+import com.o3dr.services.android.lib.coordinate.LatLongAlt;
 import com.o3dr.services.android.lib.drone.attribute.AttributeEvent;
 import com.o3dr.services.android.lib.drone.attribute.AttributeType;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloAttributes;
 import com.o3dr.services.android.lib.drone.companion.solo.SoloState;
 import com.o3dr.services.android.lib.drone.connection.ConnectionParameter;
 import com.o3dr.services.android.lib.drone.connection.ConnectionType;
+import com.o3dr.services.android.lib.drone.mission.Mission;
+import com.o3dr.services.android.lib.drone.mission.item.spatial.Waypoint;
 import com.o3dr.services.android.lib.drone.property.Altitude;
 import com.o3dr.services.android.lib.drone.property.Attitude;
 import com.o3dr.services.android.lib.drone.property.Battery;
@@ -114,8 +118,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     boolean chacking=false;
     boolean Lockcheck=false;
     boolean cadastralcheck =false;
-    boolean setPointAB = false;
     boolean selectAB =false;
+
+    String mission="";
 
     static LatLng mGuidedPoint; //가이드모드 목적지 저장
     ArrayList<LatLng> dronePointList =new ArrayList<LatLng>();
@@ -128,6 +133,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     //AB위치 정보 저장
     LatLong coordPointA ;
     LatLong coordPointB ;
+
+
+
 
 
     @Override
@@ -424,6 +432,30 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 }
                 break;
 
+            case AttributeEvent.MISSION_SENT:
+                Button ABMissionButton = (Button) findViewById(R.id.ABMissionButton);
+                if("임무시작".equals(ABMissionButton.getText())){
+                    ABMissionButton.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            recyclerlist.add("미션 보내기 완료");
+                            arrayAdepter();
+                            MissionApi.getApi(drone).startMission(true,true,null);
+                            ABMissionButton.setText("임무중지");
+                        }
+                    });
+                }
+                else if("임무중지".equals(ABMissionButton.getText())){
+                    ABMissionButton.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            MissionApi.getApi(drone).startMission(false,false,null);
+                            ABMissionButton.setText("임무시작");
+                        }
+                    });
+                }
+
+                break;
             case AttributeEvent.BATTERY_UPDATED:
                 updateVoltage();
                 break;
@@ -524,21 +556,21 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
 
         mNaverMap.setOnMapClickListener((point, coord) -> {
+            Button ABMissionButton = (Button) findViewById(R.id.ABMissionButton);
             if(selectAB) {
-                if (setPointAB) {
+                if ("A지점 설정".equals(ABMissionButton.getText())) {
                     pointB.setPosition(coord);
                     pointB.setIconTintColor(Color.BLUE);
                     pointB.setMap(mNaverMap);
-                    setPointAB = false;
                     coordPointB =new LatLong(coord.latitude,coord.longitude);
-                    drawingAB();
+                    ABMissionButton.setText("B지점 설정");
 
-                } else {
+                }
+                else if ("B지점 설정".equals(ABMissionButton.getText())) {
                     pointA.setPosition(coord);
                     pointA.setIconTintColor(Color.RED);
                     pointA.setMap(mNaverMap);
-                    setPointAB = true;
-                    coordPointA=new LatLong(coord.latitude,coord.longitude);;
+                    coordPointA=new LatLong(coord.latitude,coord.longitude);
                     drawingAB();
                 }
             }
@@ -960,6 +992,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             public void onClick(View view) {
                 Button missionButton = (Button) findViewById(R.id.missionButton);
                 missionButton.setText("AB");
+                Button ABMissionButton = (Button) findViewById(R.id.ABMissionButton);
+                ABMissionButton.setText("A지점 설정");
                 buttonClose(view);
                 selectAB=true;
             }
@@ -1106,52 +1140,68 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
 
     private void drawingAB(){
-        if((coordPointA!=null)&&(coordPointB!=null)){
-            drawLien.clear();
-            polylineAB.setMap(null);
-            Collections.addAll(drawLien,
-                    new LatLng(coordPointA.getLatitude(),coordPointA.getLongitude()),
-                    new LatLng(coordPointB.getLatitude(), coordPointB.getLongitude())
-            );
-            int checking=1;
-            while(ABdistance>flightWidth*checking){
-                if(checking%2==1){
-                    Double tempAngleB = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
-                    LatLong lineAddB=MathUtils.newCoordFromBearingAndDistance(coordPointB,90 + tempAngleB,flightWidth*checking);
-                    Collections.addAll(drawLien,
-                            new LatLng(lineAddB.getLatitude(),lineAddB.getLongitude())
-                    );
-                    Double tempAngleA = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
-                    LatLong lineAddA =MathUtils.newCoordFromBearingAndDistance(coordPointA,90 + tempAngleA,flightWidth*checking);
-                    Collections.addAll(drawLien,
-                            new LatLng(lineAddA.getLatitude(),lineAddA.getLongitude())
-                    );
-                }
-                else{
-                    Double tempAngleA = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
-                    LatLong lineAddA =MathUtils.newCoordFromBearingAndDistance(coordPointA,90 + tempAngleA,flightWidth*checking);
-                    Collections.addAll(drawLien,
-                            new LatLng(lineAddA.getLatitude(),lineAddA.getLongitude())
-                    );
-                    Double tempAngleB = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
-                    LatLong lineAddB=MathUtils.newCoordFromBearingAndDistance(coordPointB,90 + tempAngleB,flightWidth*checking);
-                    Collections.addAll(drawLien,
-                            new LatLng(lineAddB.getLatitude(),lineAddB.getLongitude())
-                    );
-
-                }
-                checking++;
+        drawLien.clear();
+        polylineAB.setMap(null);
+        Collections.addAll(drawLien,
+                new LatLng(coordPointA.getLatitude(),coordPointA.getLongitude()),
+                new LatLng(coordPointB.getLatitude(), coordPointB.getLongitude())
+        );
+        int checking=1;
+        while(ABdistance>flightWidth*checking){
+            if(checking%2==1){
+                drawPointB(checking);
+                drawPointA(checking);
             }
-            polylineAB.setCoords(drawLien);
-            polylineAB.setColor(Color.YELLOW);
-            polylineAB.setWidth(15);
-            polylineAB.setMap(mNaverMap);
-            for(int i=drawLien.size();i>0;i--){
-                LatLong dronGoingPoint = new LatLong(drawLien.get(i).latitude,drawLien.get(i).longitude);
-                ControlApi.getApi(drone).goTo(dronGoingPoint, true, null);
-           }
+            else{
+                drawPointA(checking);
+                drawPointB(checking);
+            }
+            checking++;
         }
+        polylineAB.setCoords(drawLien);
+        polylineAB.setColor(Color.YELLOW);
+        polylineAB.setWidth(15);
+        polylineAB.setMap(mNaverMap);
+        Button ABMissionButton = (Button) findViewById(R.id.ABMissionButton);
+        ABMissionButton.setText("임무전송");
+
+        ABMissionButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Mission mission = new Mission();
+                ArrayList<Waypoint> waypointlist= new ArrayList<Waypoint>();
+                for(int i = 2 ; i < drawLien.size();i++) {
+                    waypointlist.add(new Waypoint());
+                    waypointlist.get(i-2).setCoordinate(new LatLongAlt(drawLien.get(i).latitude,drawLien.get(i).longitude,altitudeState));
+                    waypointlist.get(i-2).setDelay(1);
+                    mission.addMissionItem(i-2,waypointlist.get(i-2));
+                }
+                MissionApi.getApi(drone).setMission(mission,true);
+                ABMissionButton.setText("임무시작");
+            }
+        });
+
+
+
 
     }
+
+    private void drawPointB(int checking){
+        Double tempAngleB = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
+        LatLong lineAddB=MathUtils.newCoordFromBearingAndDistance(coordPointB,90 + tempAngleB,flightWidth*checking);
+        Collections.addAll(drawLien,
+                new LatLng(lineAddB.getLatitude(),lineAddB.getLongitude())
+        );
+    }
+
+    private void drawPointA(int checking){
+        Double tempAngleA = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
+        LatLong lineAddA =MathUtils.newCoordFromBearingAndDistance(coordPointA,90 + tempAngleA,flightWidth*checking);
+        Collections.addAll(drawLien,
+                new LatLng(lineAddA.getLatitude(),lineAddA.getLongitude())
+        );
+    }
+
+
 
 }
