@@ -434,27 +434,26 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
             case AttributeEvent.MISSION_SENT:
                 Button ABMissionButton = (Button) findViewById(R.id.ABMissionButton);
-                if("임무시작".equals(ABMissionButton.getText())){
-                    ABMissionButton.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View view) {
-                            recyclerlist.add("미션 보내기 완료");
+                recyclerlist.add("미션 보내기 완료");
+                arrayAdepter();
+                ABMissionButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        if("임무시작".equals(ABMissionButton.getText())){
+                            recyclerlist.add("임무시작");
                             arrayAdepter();
+                            VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_AUTO);
                             MissionApi.getApi(drone).startMission(true,true,null);
                             ABMissionButton.setText("임무중지");
                         }
-                    });
-                }
-                else if("임무중지".equals(ABMissionButton.getText())){
-                    ABMissionButton.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View view) {
-                            MissionApi.getApi(drone).startMission(false,false,null);
+                        else if("임무중지".equals(ABMissionButton.getText())){
+                            recyclerlist.add("임무중지");
+                            arrayAdepter();
+                            VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_LOITER);
                             ABMissionButton.setText("임무시작");
                         }
-                    });
-                }
-
+                    }
+                });
                 break;
             case AttributeEvent.BATTERY_UPDATED:
                 updateVoltage();
