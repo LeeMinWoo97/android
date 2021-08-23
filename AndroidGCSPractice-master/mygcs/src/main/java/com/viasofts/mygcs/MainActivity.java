@@ -84,6 +84,7 @@ import com.viasofts.mygcs.utils.prefs.DroidPlannerPrefs;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static com.o3dr.services.android.lib.util.MathUtils.getArcInRadians;
@@ -109,34 +110,35 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     Marker pointA = new Marker();
     Marker pointB = new Marker();
 
-    double altitudeState =3.0;
+    double altitudeState = 3.0;
     double flightWidth = 3.0;
     int ABdistance = 30;
 
     ConnectionParameter connParams;
 
-    boolean chacking=false;
-    boolean Lockcheck=false;
-    boolean cadastralcheck =false;
-    boolean selectAB =false;
-
-    String mission="";
+    boolean chacking = false;
+    boolean Lockcheck = false;
+    boolean cadastralcheck = false;
+    boolean selectAB = false;
+    boolean selectPolygone = false;
+    String mission = "";
 
     static LatLng mGuidedPoint; //가이드모드 목적지 저장
-    ArrayList<LatLng> dronePointList =new ArrayList<LatLng>();
+    ArrayList<LatLng> dronePointList = new ArrayList<LatLng>();
     ArrayList<LatLng> drawLien = new ArrayList<>();
     PolylineOverlay polyline = new PolylineOverlay();
     PolylineOverlay polylineAB = new PolylineOverlay();
     // recyclerView
-    private ArrayList <String> recyclerlist = new ArrayList<>();
+    private ArrayList<String> recyclerlist = new ArrayList<>();
     Adapter adapter = new Adapter(recyclerlist);
     //AB위치 정보 저장
-    LatLong coordPointA ;
-    LatLong coordPointB ;
+    LatLong coordPointA;
+    LatLong coordPointB;
 
-
-
-
+    //폴리라인 그리기
+    ArrayList<LatLng> pointList = new ArrayList<LatLng>();
+    ArrayList<Marker> markerList = new ArrayList<Marker>();
+    PolylineOverlay polygonline = new PolylineOverlay();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -240,7 +242,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             public void onClick(View view) {
                 State vehicleState = drone.getAttribute(AttributeType.STATE);
 
-                if(vehicleState.isFlying()){
+                if (vehicleState.isFlying()) {
                     DroneStartButton.setText("Land");
                     VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_LAND, new SimpleCommandListener() {
                         @Override
@@ -248,6 +250,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                             recyclerlist.add("착륙 합니다.");
                             arrayAdepter();
                         }
+
                         @Override
                         public void onError(int executionError) {
                             alertUser("Unable to land the vehicle.");
@@ -258,9 +261,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                             alertUser("Unable to land the vehicle.");
                         }
                     });
-                }
-
-                else if(vehicleState.isArmed()) {
+                } else if (vehicleState.isArmed()) {
                     DroneStartButton.setText("Take_OFF");
                     AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
                     builder.setMessage("지정한 이륙고도까지 기체를 상승합니다.\n안전거리를 유지하세요.").setPositiveButton("확인", new DialogInterface.OnClickListener() {
@@ -295,9 +296,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
                     builder.create().show();
 
-                }
-
-                else if(vehicleState.isConnected()) {
+                } else if (vehicleState.isConnected()) {
                     DroneStartButton.setText("ARM");
                     AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
                     builder.setMessage("모터를 가동합니다.\n모터가 고속으로 회전합니다.").setPositiveButton("확인", new DialogInterface.OnClickListener() {
@@ -320,9 +319,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                                     alertUser("Arming operation timed out.");
                                 }
                             });
-                            }
-                             })
-                    .setNegativeButton("취소", new DialogInterface.OnClickListener() {
+                        }
+                    })
+                            .setNegativeButton("취소", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int id) {
                                     // User cancelled the dialog
                                 }
@@ -337,7 +336,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         buttoncreate();
     }
 
-    private void buttoncreate(){
+    private void buttoncreate() {
         //초기 고도
         landAltitude();
         altitudePlus();
@@ -439,14 +438,13 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 ABMissionButton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        if("임무시작".equals(ABMissionButton.getText())){
+                        if ("임무시작".equals(ABMissionButton.getText())) {
                             recyclerlist.add("임무시작");
                             arrayAdepter();
                             VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_AUTO);
-                            MissionApi.getApi(drone).startMission(true,true,null);
+                            MissionApi.getApi(drone).startMission(true, true, null);
                             ABMissionButton.setText("임무중지");
-                        }
-                        else if("임무중지".equals(ABMissionButton.getText())){
+                        } else if ("임무중지".equals(ABMissionButton.getText())) {
                             recyclerlist.add("임무중지");
                             arrayAdepter();
                             VehicleApi.getApi(drone).setVehicleMode(VehicleMode.COPTER_LOITER);
@@ -482,11 +480,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             case AttributeEvent.GPS_POSITION:
                 updateDronePosition();
                 droneLine();
-                if(Lockcheck){
+                if (Lockcheck) {
                     mapLocking();
                 }
-                if(chacking){
-                    CheckGoal(drone,mGuidedPoint);
+                if (chacking) {
+                    CheckGoal(drone, mGuidedPoint);
                 }
                 break;
             default:
@@ -548,36 +546,57 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         updateSpeed();
         updateYaw();
         updateGps();
-        mNaverMap.setOnMapLongClickListener((point,coord) -> {
+        mNaverMap.setOnMapLongClickListener((point, coord) -> {
             mGuidedPoint = coord;
-            LatLong lpoint = new LatLong(coord.latitude,coord.longitude);
+            LatLong lpoint = new LatLong(coord.latitude, coord.longitude);
             DialogSimple(lpoint);
         });
 
         mNaverMap.setOnMapClickListener((point, coord) -> {
             Button ABMissionButton = (Button) findViewById(R.id.ABMissionButton);
-            if(selectAB) {
+            if (selectAB) {
                 if ("A지점 설정".equals(ABMissionButton.getText())) {
                     pointB.setPosition(coord);
                     pointB.setIconTintColor(Color.BLUE);
                     pointB.setMap(mNaverMap);
-                    coordPointB =new LatLong(coord.latitude,coord.longitude);
+                    coordPointB = new LatLong(coord.latitude, coord.longitude);
                     ABMissionButton.setText("B지점 설정");
 
-                }
-                else if ("B지점 설정".equals(ABMissionButton.getText())) {
+                } else if ("B지점 설정".equals(ABMissionButton.getText())) {
                     pointA.setPosition(coord);
                     pointA.setIconTintColor(Color.RED);
                     pointA.setMap(mNaverMap);
-                    coordPointA=new LatLong(coord.latitude,coord.longitude);
+                    coordPointA = new LatLong(coord.latitude, coord.longitude);
                     drawingAB();
                 }
             }
         });
 
 
-    }
 
+        //찍힌 마커관리
+        mNaverMap.setOnMapClickListener((point, coord) -> {
+           if(selectPolygone&& pointList.size()<9){
+               Marker makerNumber = new Marker();
+               markerList.add(makerNumber);
+
+               makerNumber.setPosition(new LatLng(coord.latitude, coord.longitude));
+               makerNumber.setMap(mNaverMap);
+               pointList.add(coord);
+
+               compareTo(pointList);
+               //정렬 compaerto 시계방향
+
+               if (pointList.size() >= 3) {
+                   pointList.add(pointList.get(0));
+                   polygonline.setCoords(pointList);
+                   polygonline.setMap(mNaverMap);
+               }
+           }
+        });
+
+
+    }
 
 
     //전압 txet출력
@@ -663,11 +682,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     }
 
 
-    protected void updateDronePosition(){
-        Gps location  = this.drone.getAttribute(AttributeType.GPS);
+    protected void updateDronePosition() {
+        Gps location = this.drone.getAttribute(AttributeType.GPS);
 
-        double latitude =  location.getPosition().getLatitude();
-        double longitude= location.getPosition().getLongitude();
+        double latitude = location.getPosition().getLatitude();
+        double longitude = location.getPosition().getLongitude();
 
         marker.setPosition(new LatLng(latitude, longitude));
         marker.setMap(mNaverMap);
@@ -675,11 +694,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         Attitude droneAttribute = this.drone.getAttribute(AttributeType.ATTITUDE);
         TextView TextViewYaw = (TextView) findViewById(R.id.TextViewYaw);
         double Yaw = droneAttribute.getYaw() + 180;
-        marker.setAngle((int)Yaw);
+        marker.setAngle((int) Yaw);
 
     }
 
-    private void landAltitude(){
+    private void landAltitude() {
 
         Button landAltitudeButton = (Button) findViewById(R.id.landAltitudeButton);
         landAltitudeButton.setOnClickListener(new View.OnClickListener() {
@@ -687,43 +706,43 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             public void onClick(View view) {
                 Button AltitudePlusButton = (Button) findViewById(R.id.AltitudePlusButton);
                 Button AltitudeSubtractButton = (Button) findViewById(R.id.AltitudeSubtractButton);
-                    if(AltitudePlusButton.getVisibility()==view.INVISIBLE){
-                        AltitudePlusButton.setVisibility(view.VISIBLE);
-                        AltitudeSubtractButton.setVisibility(view.VISIBLE);
-                    }
-                    else{
-                        AltitudePlusButton.setVisibility(view.INVISIBLE);
-                        AltitudeSubtractButton.setVisibility(view.INVISIBLE);
-                    }
+                if (AltitudePlusButton.getVisibility() == view.INVISIBLE) {
+                    AltitudePlusButton.setVisibility(view.VISIBLE);
+                    AltitudeSubtractButton.setVisibility(view.VISIBLE);
+                } else {
+                    AltitudePlusButton.setVisibility(view.INVISIBLE);
+                    AltitudeSubtractButton.setVisibility(view.INVISIBLE);
+                }
             }
         });
     }
 
-    private void altitudePlus(){
+    private void altitudePlus() {
 
         Button AltitudePlusButton = (Button) findViewById(R.id.AltitudePlusButton);
         AltitudePlusButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button landAltitudeButton = (Button) findViewById(R.id.landAltitudeButton);
-                if(altitudeState<10){
-                    altitudeState+=0.5;
-                    landAltitudeButton.setText(String.valueOf(altitudeState)+"m");
+                if (altitudeState < 10) {
+                    altitudeState += 0.5;
+                    landAltitudeButton.setText(String.valueOf(altitudeState) + "m");
                 }
 
             }
         });
     }
 
-    private void altitudeSubtract(){
+    private void altitudeSubtract() {
         Button AltitudeSubtractButton = (Button) findViewById(R.id.AltitudeSubtractButton);
         AltitudeSubtractButton.setOnClickListener(new View.OnClickListener() {
             Button landAltitudeButton = (Button) findViewById(R.id.landAltitudeButton);
+
             @Override
             public void onClick(View view) {
-                if(altitudeState>3){
-                    altitudeState-=0.5;
-                    landAltitudeButton.setText(String.valueOf(altitudeState)+"m");
+                if (altitudeState > 3) {
+                    altitudeState -= 0.5;
+                    landAltitudeButton.setText(String.valueOf(altitudeState) + "m");
                 }
 
             }
@@ -733,17 +752,16 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     public void DialogSimple(LatLong point) {
         State vehicleState = this.drone.getAttribute(AttributeType.STATE);
-        if(vehicleState.getVehicleMode()==VehicleMode.COPTER_GUIDED){
+        if (vehicleState.getVehicleMode() == VehicleMode.COPTER_GUIDED) {
             guideMarker.setPosition(new LatLng(mGuidedPoint.latitude, mGuidedPoint.longitude));
             guideMarker.setIconTintColor(Color.YELLOW);
             guideMarker.setMap(mNaverMap);
             ControlApi.getApi(drone).goTo(point, true, null);
-            chacking=true;
-            recyclerlist.add(mGuidedPoint.latitude+" "+mGuidedPoint.longitude+"위치로 이동합니다.");
+            chacking = true;
+            recyclerlist.add(mGuidedPoint.latitude + " " + mGuidedPoint.longitude + "위치로 이동합니다.");
             arrayAdepter();
 
-        }
-        else{
+        } else {
             AlertDialog.Builder alt_bld = new AlertDialog.Builder(MainActivity.this);
             alt_bld.setMessage("확인하시면 가이드모드로 전환후 기체가 이동합니다.").setCancelable(false).setPositiveButton("확인", new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int id) {
@@ -756,13 +774,15 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                                     guideMarker.setIconTintColor(Color.YELLOW);
                                     guideMarker.setMap(mNaverMap);
                                     ControlApi.getApi(drone).goTo(point, true, null);
-                                    chacking=true;
-                                    recyclerlist.add(mGuidedPoint.latitude+" "+mGuidedPoint.longitude+"위치로 이동합니다.");
+                                    chacking = true;
+                                    recyclerlist.add(mGuidedPoint.latitude + " " + mGuidedPoint.longitude + "위치로 이동합니다.");
                                     arrayAdepter();
                                 }
+
                                 @Override
                                 public void onError(int i) {
                                 }
+
                                 @Override
                                 public void onTimeout() {
                                 }
@@ -780,6 +800,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             alert.show();
         }
     }
+
     public static boolean CheckGoal(final Drone drone, LatLng recentLatLng) {
         GuidedState guidedState = drone.getAttribute(AttributeType.GUIDED_STATE);
         LatLng target = new LatLng(guidedState.getCoordinate().getLatitude(),
@@ -787,19 +808,19 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         return target.distanceTo(recentLatLng) <= 1;
     }
 
-    private void droneLine(){
-        Gps linepoint  = this.drone.getAttribute(AttributeType.GPS);
-        double lineLatitude =  linepoint.getPosition().getLatitude();
+    private void droneLine() {
+        Gps linepoint = this.drone.getAttribute(AttributeType.GPS);
+        double lineLatitude = linepoint.getPosition().getLatitude();
         double lineLogitude = linepoint.getPosition().getLongitude();
 
         Collections.addAll(dronePointList,
-                new LatLng(lineLatitude,lineLogitude)
+                new LatLng(lineLatitude, lineLogitude)
         );
         polyline.setCoords(dronePointList);
         polyline.setMap(mNaverMap);
     }
 
-    private void selectMap(){
+    private void selectMap() {
         Button mapButton = (Button) findViewById(R.id.mapButton);
         mapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -807,12 +828,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button basicMapButton = (Button) findViewById(R.id.basicMapButton);
                 Button satelliteMapButton = (Button) findViewById(R.id.satelliteMapButton);
                 Button terrainMapButton = (Button) findViewById(R.id.terrainMapButton);
-                if(basicMapButton.getVisibility()==view.INVISIBLE){
+                if (basicMapButton.getVisibility() == view.INVISIBLE) {
                     basicMapButton.setVisibility(view.VISIBLE);
                     satelliteMapButton.setVisibility(view.VISIBLE);
                     terrainMapButton.setVisibility(view.VISIBLE);
-                }
-                else{
+                } else {
                     basicMapButton.setVisibility(view.INVISIBLE);
                     satelliteMapButton.setVisibility(view.INVISIBLE);
                     terrainMapButton.setVisibility(view.INVISIBLE);
@@ -821,7 +841,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void basicMapSelect(){
+    private void basicMapSelect() {
         Button basicMapButton = (Button) findViewById(R.id.basicMapButton);
         basicMapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -833,7 +853,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void satelliteMapSelect(){
+    private void satelliteMapSelect() {
         Button satelliteMapButton = (Button) findViewById(R.id.satelliteMapButton);
         satelliteMapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -845,7 +865,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void terrainMapSelect(){
+    private void terrainMapSelect() {
         Button terrainMapButton = (Button) findViewById(R.id.terrainMapButton);
         terrainMapButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -857,7 +877,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void mapState(){
+    private void mapState() {
         Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
         mapStateButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -865,11 +885,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button mapMoveButton = (Button) findViewById(R.id.mapMoveButton);
                 Button mapLockButton = (Button) findViewById(R.id.mapLockButton);
 
-                if(mapMoveButton.getVisibility()==view.INVISIBLE){
+                if (mapMoveButton.getVisibility() == view.INVISIBLE) {
                     mapMoveButton.setVisibility(view.VISIBLE);
                     mapLockButton.setVisibility(view.VISIBLE);
-                }
-                else{
+                } else {
                     mapMoveButton.setVisibility(view.INVISIBLE);
                     mapLockButton.setVisibility(view.INVISIBLE);
                 }
@@ -877,37 +896,37 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void mapMove(){
+    private void mapMove() {
         Button mapMoveButton = (Button) findViewById(R.id.mapMoveButton);
         mapMoveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
                 mapStateButton.setText("맵 이동");
-                Lockcheck=false;
+                Lockcheck = false;
                 recyclerlist.add("맵을 이동할 수 있는 상태입니다.");
                 arrayAdepter();
             }
         });
     }
 
-    private void mapLock(){
+    private void mapLock() {
         Button mapLockButton = (Button) findViewById(R.id.mapLockButton);
         mapLockButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button mapStateButton = (Button) findViewById(R.id.mapStateButton);
                 mapStateButton.setText("맵 잠금");
-                Lockcheck=true;
+                Lockcheck = true;
                 recyclerlist.add("맵을 이동할 수 없는 상태입니다.");
                 arrayAdepter();
             }
         });
     }
 
-    private void mapLocking(){
-        Gps mapLocking  = this.drone.getAttribute(AttributeType.GPS);
-        double lockingLatitude =  mapLocking.getPosition().getLatitude();
+    private void mapLocking() {
+        Gps mapLocking = this.drone.getAttribute(AttributeType.GPS);
+        double lockingLatitude = mapLocking.getPosition().getLatitude();
         double lockingLogitude = mapLocking.getPosition().getLongitude();
 
         CameraUpdate cameraUpdate = CameraUpdate.scrollTo(new LatLng(lockingLatitude, lockingLogitude));
@@ -915,27 +934,25 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     }
 
-    private void cadastralMap(){
+    private void cadastralMap() {
         Button cadastralMapButton = (Button) findViewById(R.id.cadastralMapButton);
         cadastralMapButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(cadastralcheck){
+                if (cadastralcheck) {
                     mNaverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, false);
                     cadastralMapButton.setText("지적도 OFF");
-                    cadastralcheck=false;
-                }
-
-                else{
+                    cadastralcheck = false;
+                } else {
                     mNaverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, true);
                     cadastralMapButton.setText("지적도 ON");
-                    cadastralcheck=true;
+                    cadastralcheck = true;
                 }
             }
         });
     }
 
-    private void arrayAdepter(){
+    private void arrayAdepter() {
         // arrayadepter
 
         RecyclerView listView = findViewById(R.id.recyclerView);
@@ -944,7 +961,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     }
 
-    private void allClear(){
+    private void allClear() {
         Button clearAllButton = (Button) findViewById(R.id.clearAllButton);
         clearAllButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -953,15 +970,21 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 arrayAdepter();
                 polyline.setMap(null);
                 Gps stopGps = drone.getAttribute(AttributeType.GPS);
-                LatLong point=stopGps.getPosition();
+                LatLong point = stopGps.getPosition();
                 ControlApi.getApi(drone).goTo(point, true, null);
-                chacking=false;
+                chacking = false;
                 guideMarker.setMap(null);
+                pointList.clear();
+                for(Marker m : markerList){
+                    m.setMap(null);
+                }
+                markerList.clear();
+                polygonline.setMap(null);
             }
         });
     }
 
-    private void missionButton(){
+    private void missionButton() {
         Button missionButton = (Button) findViewById(R.id.missionButton);
         missionButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -970,12 +993,11 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button polygoneButton = (Button) findViewById(R.id.polygoneButton);
                 Button cancelbutton = (Button) findViewById(R.id.cancelbutton);
 
-                if(lineABButton.getVisibility()==view.INVISIBLE){
+                if (lineABButton.getVisibility() == view.INVISIBLE) {
                     lineABButton.setVisibility(view.VISIBLE);
                     polygoneButton.setVisibility(view.VISIBLE);
                     cancelbutton.setVisibility(view.VISIBLE);
-                }
-                else{
+                } else {
                     lineABButton.setVisibility(view.INVISIBLE);
                     polygoneButton.setVisibility(view.INVISIBLE);
                     cancelbutton.setVisibility(view.INVISIBLE);
@@ -984,7 +1006,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void clickButtonAB(){
+    private void clickButtonAB() {
         Button lineABButton = (Button) findViewById(R.id.lineABButton);
         lineABButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -994,30 +1016,35 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 Button ABMissionButton = (Button) findViewById(R.id.ABMissionButton);
                 ABMissionButton.setText("A지점 설정");
                 buttonClose(view);
-                selectAB=true;
+                selectAB = true;
+                selectPolygone = false;
             }
-         });
+        });
     }
 
-    private void clickButtonPolygone(){
+    private void clickButtonPolygone() {
         Button polygoneButton = (Button) findViewById(R.id.polygoneButton);
         polygoneButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button missionButton = (Button) findViewById(R.id.missionButton);
                 missionButton.setText("다각형");
+                selectPolygone = true;
+                selectAB = false;
                 buttonClose(view);
             }
         });
     }
 
-    private void clickCancel(){
+    private void clickCancel() {
         Button cancelbutton = (Button) findViewById(R.id.cancelbutton);
         cancelbutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button missionButton = (Button) findViewById(R.id.missionButton);
                 missionButton.setText("취소");
+                selectAB = false;
+                selectPolygone = false;
                 buttonClose(view);
 
             }
@@ -1025,7 +1052,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     }
 
 
-    private void buttonClose(View view){
+    private void buttonClose(View view) {
         Button lineABButton = (Button) findViewById(R.id.lineABButton);
         Button polygoneButton = (Button) findViewById(R.id.polygoneButton);
         Button cancelbutton = (Button) findViewById(R.id.cancelbutton);
@@ -1035,7 +1062,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     }
 
     //비행폭 초기값 설정 버튼
-    private void flightWidth(){
+    private void flightWidth() {
 
         Button flightWidthbutton = (Button) findViewById(R.id.flightWidthbutton);
         flightWidthbutton.setOnClickListener(new View.OnClickListener() {
@@ -1043,11 +1070,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             public void onClick(View view) {
                 Button widthIncreasebutton = (Button) findViewById(R.id.widthIncreasebutton);
                 Button widthDecreasebutton = (Button) findViewById(R.id.widthDecreasebutton);
-                if(widthIncreasebutton.getVisibility()==view.INVISIBLE){
+                if (widthIncreasebutton.getVisibility() == view.INVISIBLE) {
                     widthIncreasebutton.setVisibility(view.VISIBLE);
                     widthDecreasebutton.setVisibility(view.VISIBLE);
-                }
-                else{
+                } else {
                     widthIncreasebutton.setVisibility(view.INVISIBLE);
                     widthDecreasebutton.setVisibility(view.INVISIBLE);
                 }
@@ -1055,31 +1081,31 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void flightWidthPlus(){
+    private void flightWidthPlus() {
 
         Button widthIncreasebutton = (Button) findViewById(R.id.widthIncreasebutton);
         widthIncreasebutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button flightWidthbutton = (Button) findViewById(R.id.flightWidthbutton);
-                if(flightWidth<10){
-                    flightWidth+=0.5;
-                    flightWidthbutton.setText(String.valueOf(flightWidth)+"m" + "비행폭");
+                if (flightWidth < 10) {
+                    flightWidth += 0.5;
+                    flightWidthbutton.setText(String.valueOf(flightWidth) + "m" + "비행폭");
                 }
 
             }
         });
     }
 
-    private void flightWidthSubtract(){
+    private void flightWidthSubtract() {
         Button widthDecreasebutton = (Button) findViewById(R.id.widthDecreasebutton);
         widthDecreasebutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button flightWidthbutton = (Button) findViewById(R.id.flightWidthbutton);
-                if(flightWidth>3){
-                    flightWidth-=0.5;
-                    flightWidthbutton.setText(String.valueOf(flightWidth)+"m"+"비행폭");
+                if (flightWidth > 3) {
+                    flightWidth -= 0.5;
+                    flightWidthbutton.setText(String.valueOf(flightWidth) + "m" + "비행폭");
                 }
 
             }
@@ -1087,18 +1113,17 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     }
 
     //AB거리 초기값 설정 버튼
-    private void ABdistance(){
+    private void ABdistance() {
         Button ABdistancebutton = (Button) findViewById(R.id.ABdistancebutton);
         ABdistancebutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button distanceIncresebutton = (Button) findViewById(R.id.distanceIncresebutton);
                 Button distanceDecreasebutton = (Button) findViewById(R.id.distanceDecreasebutton);
-                if(distanceIncresebutton.getVisibility()==view.INVISIBLE){
+                if (distanceIncresebutton.getVisibility() == view.INVISIBLE) {
                     distanceIncresebutton.setVisibility(view.VISIBLE);
                     distanceDecreasebutton.setVisibility(view.VISIBLE);
-                }
-                else{
+                } else {
                     distanceIncresebutton.setVisibility(view.INVISIBLE);
                     distanceDecreasebutton.setVisibility(view.INVISIBLE);
                 }
@@ -1106,31 +1131,31 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
     }
 
-    private void ABdistancePlus(){
+    private void ABdistancePlus() {
 
         Button distanceIncresebutton = (Button) findViewById(R.id.distanceIncresebutton);
         distanceIncresebutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button ABdistancebutton = (Button) findViewById(R.id.ABdistancebutton);
-                if(ABdistance<100){
-                    ABdistance+=10;
-                    ABdistancebutton.setText(String.valueOf(ABdistance)+"m"+"AB");
+                if (ABdistance < 100) {
+                    ABdistance += 10;
+                    ABdistancebutton.setText(String.valueOf(ABdistance) + "m" + "AB");
                 }
 
             }
         });
     }
 
-    private void ABdistanceSubtract(){
+    private void ABdistanceSubtract() {
         Button distanceDecreasebutton = (Button) findViewById(R.id.distanceDecreasebutton);
         distanceDecreasebutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Button ABdistancebutton = (Button) findViewById(R.id.ABdistancebutton);
-                if(ABdistance>30){
-                    ABdistance-=10;
-                    ABdistancebutton.setText(String.valueOf(ABdistance)+"m"+"AB");
+                if (ABdistance > 30) {
+                    ABdistance -= 10;
+                    ABdistancebutton.setText(String.valueOf(ABdistance) + "m" + "AB");
                 }
 
             }
@@ -1138,20 +1163,19 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     }
 
 
-    private void drawingAB(){
+    private void drawingAB() {
         drawLien.clear();
         polylineAB.setMap(null);
         Collections.addAll(drawLien,
-                new LatLng(coordPointA.getLatitude(),coordPointA.getLongitude()),
+                new LatLng(coordPointA.getLatitude(), coordPointA.getLongitude()),
                 new LatLng(coordPointB.getLatitude(), coordPointB.getLongitude())
         );
-        int checking=1;
-        while(ABdistance>flightWidth*checking){
-            if(checking%2==1){
+        int checking = 1;
+        while (ABdistance > flightWidth * checking) {
+            if (checking % 2 == 1) {
                 drawPointB(checking);
                 drawPointA(checking);
-            }
-            else{
+            } else {
                 drawPointA(checking);
                 drawPointB(checking);
             }
@@ -1168,39 +1192,58 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             @Override
             public void onClick(View view) {
                 Mission mission = new Mission();
-                ArrayList<Waypoint> waypointlist= new ArrayList<Waypoint>();
-                for(int i = 2 ; i < drawLien.size();i++) {
+                ArrayList<Waypoint> waypointlist = new ArrayList<Waypoint>();
+                for (int i = 2; i < drawLien.size(); i++) {
                     waypointlist.add(new Waypoint());
-                    waypointlist.get(i-2).setCoordinate(new LatLongAlt(drawLien.get(i).latitude,drawLien.get(i).longitude,altitudeState));
-                    waypointlist.get(i-2).setDelay(1);
-                    mission.addMissionItem(i-2,waypointlist.get(i-2));
+                    waypointlist.get(i - 2).setCoordinate(new LatLongAlt(drawLien.get(i).latitude, drawLien.get(i).longitude, altitudeState));
+                    waypointlist.get(i - 2).setDelay(1);
+                    mission.addMissionItem(i - 2, waypointlist.get(i - 2));
                 }
-                MissionApi.getApi(drone).setMission(mission,true);
+                MissionApi.getApi(drone).setMission(mission, true);
                 ABMissionButton.setText("임무시작");
             }
         });
 
 
-
-
     }
 
-    private void drawPointB(int checking){
+    private void drawPointB(int checking) {
         Double tempAngleB = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
-        LatLong lineAddB=MathUtils.newCoordFromBearingAndDistance(coordPointB,90 + tempAngleB,flightWidth*checking);
+        LatLong lineAddB = MathUtils.newCoordFromBearingAndDistance(coordPointB, 90 + tempAngleB, flightWidth * checking);
         Collections.addAll(drawLien,
-                new LatLng(lineAddB.getLatitude(),lineAddB.getLongitude())
+                new LatLng(lineAddB.getLatitude(), lineAddB.getLongitude())
         );
     }
 
-    private void drawPointA(int checking){
+    private void drawPointA(int checking) {
         Double tempAngleA = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
-        LatLong lineAddA =MathUtils.newCoordFromBearingAndDistance(coordPointA,90 + tempAngleA,flightWidth*checking);
+        LatLong lineAddA = MathUtils.newCoordFromBearingAndDistance(coordPointA, 90 + tempAngleA, flightWidth * checking);
         Collections.addAll(drawLien,
-                new LatLng(lineAddA.getLatitude(),lineAddA.getLongitude())
+                new LatLng(lineAddA.getLatitude(), lineAddA.getLongitude())
         );
     }
 
 
+    public ArrayList compareTo(ArrayList<LatLng> pointList) {
+        float averageX = 0;
+        float averageY = 0;
+        for (LatLng latLng : pointList) {
+            averageX += latLng.latitude;
+            averageY += latLng.longitude;
+        }
+        final float finalAverageX = averageX / pointList.size();
+        final float finalAverageY = averageY / pointList.size();
+        Comparator<LatLng> comparator = (lhs, rhs) -> {
+            double lhsAngle = Math.atan2(lhs.longitude - finalAverageY, lhs.latitude - finalAverageX);
+            double rhsAngle = Math.atan2(rhs.longitude - finalAverageY, rhs.latitude - finalAverageX);
+            // Depending on the coordinate system, you might need to reverse these two conditions
+            if (lhsAngle < rhsAngle) return -1;
+            if (lhsAngle > rhsAngle) return 1;
+            return 0;
+        };
+        Collections.sort(pointList, comparator);
+
+        return pointList;
+    }
 
 }
