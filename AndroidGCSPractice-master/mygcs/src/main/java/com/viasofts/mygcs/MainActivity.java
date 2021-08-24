@@ -125,7 +125,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
     static LatLng mGuidedPoint; //가이드모드 목적지 저장
     ArrayList<LatLng> dronePointList = new ArrayList<LatLng>();
-    ArrayList<LatLng> drawLien = new ArrayList<>();
+    ArrayList<LatLng> drawLine = new ArrayList<>();
     PolylineOverlay polyline = new PolylineOverlay();
     PolylineOverlay polylineAB = new PolylineOverlay();
     // recyclerView
@@ -573,26 +573,30 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         });
 
 
-
         //찍힌 마커관리
         mNaverMap.setOnMapClickListener((point, coord) -> {
-           if(selectPolygone&& pointList.size()<9){
-               Marker makerNumber = new Marker();
-               markerList.add(makerNumber);
+            if (selectPolygone && pointList.size() < 6) {
+                Marker makerNumber = new Marker();
+                markerList.add(makerNumber);
 
-               makerNumber.setPosition(new LatLng(coord.latitude, coord.longitude));
-               makerNumber.setMap(mNaverMap);
-               pointList.add(coord);
+                makerNumber.setPosition(new LatLng(coord.latitude, coord.longitude));
+                makerNumber.setMap(mNaverMap);
+                pointList.add(coord);
 
-               compareTo(pointList);
-               //정렬 compaerto 시계방향
+                compareTo(pointList);
+                //정렬 compaerto 시계방향
 
-               if (pointList.size() >= 3) {
-                   pointList.add(pointList.get(0));
-                   polygonline.setCoords(pointList);
-                   polygonline.setMap(mNaverMap);
-               }
-           }
+                if (pointList.size() >= 3) {
+                    pointList.add(pointList.get(0));
+                    polygonline.setCoords(pointList);
+                    polygonline.setPattern(10, 5);
+                    polygonline.setColor(Color.RED);
+                    //그려진 폴리곤 안에 범위 탐색 시작
+                    drawPolygon();
+                    polygonline.setMap(mNaverMap);
+                    pointList.remove(pointList.size() - 1);
+                }
+            }
         });
 
 
@@ -975,7 +979,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 chacking = false;
                 guideMarker.setMap(null);
                 pointList.clear();
-                for(Marker m : markerList){
+                for (Marker m : markerList) {
                     m.setMap(null);
                 }
                 markerList.clear();
@@ -1164,9 +1168,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
 
 
     private void drawingAB() {
-        drawLien.clear();
+        drawLine.clear();
         polylineAB.setMap(null);
-        Collections.addAll(drawLien,
+        Collections.addAll(drawLine,
                 new LatLng(coordPointA.getLatitude(), coordPointA.getLongitude()),
                 new LatLng(coordPointB.getLatitude(), coordPointB.getLongitude())
         );
@@ -1181,7 +1185,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             }
             checking++;
         }
-        polylineAB.setCoords(drawLien);
+        polylineAB.setCoords(drawLine);
         polylineAB.setColor(Color.YELLOW);
         polylineAB.setWidth(15);
         polylineAB.setMap(mNaverMap);
@@ -1193,9 +1197,9 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
             public void onClick(View view) {
                 Mission mission = new Mission();
                 ArrayList<Waypoint> waypointlist = new ArrayList<Waypoint>();
-                for (int i = 2; i < drawLien.size(); i++) {
+                for (int i = 2; i < drawLine.size(); i++) {
                     waypointlist.add(new Waypoint());
-                    waypointlist.get(i - 2).setCoordinate(new LatLongAlt(drawLien.get(i).latitude, drawLien.get(i).longitude, altitudeState));
+                    waypointlist.get(i - 2).setCoordinate(new LatLongAlt(drawLine.get(i).latitude, drawLine.get(i).longitude, altitudeState));
                     waypointlist.get(i - 2).setDelay(1);
                     mission.addMissionItem(i - 2, waypointlist.get(i - 2));
                 }
@@ -1210,7 +1214,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     private void drawPointB(int checking) {
         Double tempAngleB = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
         LatLong lineAddB = MathUtils.newCoordFromBearingAndDistance(coordPointB, 90 + tempAngleB, flightWidth * checking);
-        Collections.addAll(drawLien,
+        Collections.addAll(drawLine,
                 new LatLng(lineAddB.getLatitude(), lineAddB.getLongitude())
         );
     }
@@ -1218,7 +1222,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     private void drawPointA(int checking) {
         Double tempAngleA = MathUtils.getHeadingFromCoordinates(coordPointA, coordPointB);
         LatLong lineAddA = MathUtils.newCoordFromBearingAndDistance(coordPointA, 90 + tempAngleA, flightWidth * checking);
-        Collections.addAll(drawLien,
+        Collections.addAll(drawLine,
                 new LatLng(lineAddA.getLatitude(), lineAddA.getLongitude())
         );
     }
@@ -1244,6 +1248,10 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
         Collections.sort(pointList, comparator);
 
         return pointList;
+    }
+
+    private void drawPolygon(){
+
     }
 
 }
