@@ -139,6 +139,8 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     ArrayList<LatLng> pointList = new ArrayList<LatLng>();
     ArrayList<Marker> markerList = new ArrayList<Marker>();
     PolylineOverlay polygonline = new PolylineOverlay();
+    LatLong rememberAPoint ;
+    LatLong rememberBPoint ;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -595,6 +597,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                     drawPolygon();
                     polygonline.setMap(mNaverMap);
                     pointList.remove(pointList.size() - 1);
+
                 }
             }
         });
@@ -1251,7 +1254,58 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
     }
 
     private void drawPolygon(){
-
+        double checkline=0;
+        double longline =0;
+        for(int i = 0; i<pointList.size()-1;i++){
+            LatLong Apoint=new LatLong(pointList.get(i).latitude,pointList.get(i).longitude);
+            LatLong Bpoint=new LatLong(pointList.get(i+1).latitude,pointList.get(i+1).longitude);
+            checkline=MathUtils.getDistance2D(Apoint,Bpoint);
+            if(checkline>longline){
+                longline=checkline;
+                rememberAPoint=Apoint;
+                rememberBPoint=Bpoint;
+            }
+        }
+        drawLine.clear();
+        polylineAB.setMap(null);
+        Double addAngle = MathUtils.getHeadingFromCoordinates(rememberAPoint, rememberBPoint);
+        LatLong newAPoint=MathUtils.newCoordFromBearingAndDistance(rememberAPoint,180+addAngle,longline);
+        LatLong newBPoint=MathUtils.newCoordFromBearingAndDistance(rememberBPoint,addAngle+180,-longline);
+        Collections.addAll(drawLine,
+                new LatLng(newAPoint.getLatitude(), newAPoint.getLongitude()),
+                new LatLng(newBPoint.getLatitude(), newBPoint.getLongitude())
+        );
+        int checking = 1;
+        while (new LatLng(rememberAPoint.getLatitude(),rememberAPoint.getLongitude()).distanceTo(new LatLng(rememberBPoint.getLatitude(),rememberBPoint.getLongitude())) > flightWidth * checking) {
+            if (checking % 2 == 1) {
+                drawPolygonB(checking,newAPoint,newBPoint);
+                drawPolygonA(checking,newAPoint,newBPoint);
+            } else {
+                drawPolygonA(checking,newAPoint,newBPoint);
+                drawPolygonB(checking,newAPoint,newBPoint);
+            }
+            checking++;
+        }
+        polylineAB.setCoords(drawLine);
+        polylineAB.setColor(Color.YELLOW);
+        polylineAB.setWidth(15);
+        polylineAB.setMap(mNaverMap);
     }
+    private void drawPolygonB(int checking,LatLong newAPoint,LatLong newBPoint) {
+        Double tempAngleB = MathUtils.getHeadingFromCoordinates(newAPoint, newBPoint);
+        LatLong lineAddB = MathUtils.newCoordFromBearingAndDistance(newBPoint, 90 + tempAngleB, flightWidth * checking);
+        Collections.addAll(drawLine,
+                new LatLng(lineAddB.getLatitude(), lineAddB.getLongitude())
+        );
+    }
+
+    private void drawPolygonA(int checking,LatLong newAPoint,LatLong newBPoint) {
+        Double tempAngleA = MathUtils.getHeadingFromCoordinates(newAPoint, newBPoint);
+        LatLong lineAddA = MathUtils.newCoordFromBearingAndDistance(newAPoint, 90 + tempAngleA, flightWidth * checking);
+        Collections.addAll(drawLine,
+                new LatLng(lineAddA.getLatitude(), lineAddA.getLongitude())
+        );
+    }
+
 
 }
