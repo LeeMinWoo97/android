@@ -208,7 +208,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                         public void onClick(DialogInterface dialog, int id) {
                             drone.connect(connParams);
                             button.setText("DISCONNECT");
-                            recyclerlist.add(" 드론과 연결이 끊어졌습니다.");
+                            recyclerlist.add(" 드론과 연결 되었습니다.");
                             arrayAdepter();
                         }
                     });
@@ -573,35 +573,6 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 }
             }
         });
-
-
-        //찍힌 마커관리
-        mNaverMap.setOnMapClickListener((point, coord) -> {
-            if (selectPolygone && pointList.size() < 6) {
-                Marker makerNumber = new Marker();
-                markerList.add(makerNumber);
-
-                makerNumber.setPosition(new LatLng(coord.latitude, coord.longitude));
-                makerNumber.setMap(mNaverMap);
-                pointList.add(coord);
-
-                compareTo(pointList);
-                //정렬 compaerto 시계방향
-
-                if (pointList.size() >= 3) {
-                    pointList.add(pointList.get(0));
-                    polygonline.setCoords(pointList);
-                    polygonline.setPattern(10, 5);
-                    polygonline.setColor(Color.RED);
-                    //그려진 폴리곤 안에 범위 탐색 시작
-                    drawPolygon();
-                    polygonline.setMap(mNaverMap);
-                    pointList.remove(pointList.size() - 1);
-
-                }
-            }
-        });
-
 
     }
 
@@ -1203,7 +1174,7 @@ public class MainActivity extends AppCompatActivity implements DroneListener, To
                 for (int i = 2; i < drawLine.size(); i++) {
                     waypointlist.add(new Waypoint());
                     waypointlist.get(i - 2).setCoordinate(new LatLongAlt(drawLine.get(i).latitude, drawLine.get(i).longitude, altitudeState));
-                    waypointlist.get(i - 2).setDelay(1);
+                    waypointlist.get(i - 2).setDelay(5);
                     mission.addMissionItem(i - 2, waypointlist.get(i - 2));
                 }
                 MissionApi.getApi(drone).setMission(mission, true);
